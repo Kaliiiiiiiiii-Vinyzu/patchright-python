@@ -80,15 +80,21 @@ async def main():
 asyncio.run(main())
 ```
 
-### Best Practices
+### Best Practice - use Chrome without custom browser headers
 
 To be completely undetected, use the following configuration:
+```
+playwright install chrome
+```
+*Note*, we recommend using _Chrome_ instead of _Chromium_
+
 ```py
 playwright.chromium.launch_persistent_context(
     user_data_dir="...",
-    channel="chromium",
+    channel="chrome",
     headless=False,
     no_viewport=True,
+    # do NOT add custom browser headers or user_agent
     ...
 )
 ```
