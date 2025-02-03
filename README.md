@@ -86,7 +86,7 @@ To be completely undetected, use the following configuration:
 ```py
 playwright.chromium.launch_persistent_context(
     user_data_dir="...",
-    channel="chrome",
+    channel="chromium",
     headless=False,
     no_viewport=True,
     ...
