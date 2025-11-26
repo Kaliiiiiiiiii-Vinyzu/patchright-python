@@ -545,11 +545,13 @@ with open("playwright-python/playwright/sync_api/_generated.py") as f:
                     node.args.kwonlyargs.append(new_arg)
                     node.args.kw_defaults.append(ast.Constant(value=None))
 
-                    for subnode in ast.walk(node):
-                        if isinstance(subnode, ast.Call) and subnode.func.attr == node.name:
-                            subnode.keywords.append(
-                                ast.keyword(arg="focusControl", value=ast.Name(id="focus_control", ctx=ast.Load()))
-                            )
+
+                    if class_node.name != "BrowserContext" and node.name != "new_page":
+                        for subnode in ast.walk(node):
+                            if isinstance(subnode, ast.Call) and subnode.func.attr == node.name:
+                                subnode.keywords.append(
+                                    ast.keyword(arg="focusControl", value=ast.Name(id="focus_control", ctx=ast.Load()))
+                                )
 
     patch_file("playwright-python/playwright/sync_api/_generated.py", async_generated_tree)
 
