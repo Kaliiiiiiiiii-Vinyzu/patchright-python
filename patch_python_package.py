@@ -123,6 +123,42 @@ with open("playwright-python/playwright/_impl/__pyinstaller/hook-playwright.sync
 
     patch_file("playwright-python/playwright/_impl/__pyinstaller/hook-playwright.sync_api.py", async_api_tree)
 
+# Patching playwright/_impl/_browser.py
+with open("playwright-python/playwright/_impl/_browser.py") as f:
+    browser_source = f.read()
+    browser_tree = ast.parse(browser_source)
+
+    for node in ast.walk(browser_tree):
+        if isinstance(node, ast.AsyncFunctionDef) and node.name in ["new_context", "new_page"]:
+            node.args.kwonlyargs.append(ast.arg(
+                arg="focusControl",
+                annotation=ast.Subscript(
+                    value=ast.Name(id="Optional", ctx=ast.Load()),
+                    slice=ast.Name(id="bool", ctx=ast.Load()),
+                    ctx=ast.Load(),
+                ),
+            ))
+            node.args.kw_defaults.append(ast.Constant(value=None))
+    patch_file("playwright-python/playwright/_impl/_browser.py", browser_tree)
+
+# Patching playwright/_impl/_browser_type.py
+with open("playwright-python/playwright/_impl/_browser_type.py") as f:
+    browser_type_source = f.read()
+    browser_type_tree = ast.parse(browser_type_source)
+
+    for node in ast.walk(browser_type_tree):
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "launch_persistent_context":
+            node.args.kwonlyargs.append(ast.arg(
+                arg="focusControl",
+                annotation=ast.Subscript(
+                    value=ast.Name(id="Optional", ctx=ast.Load()),
+                    slice=ast.Name(id="bool", ctx=ast.Load()),
+                    ctx=ast.Load(),
+                ),
+            ))
+            node.args.kw_defaults.append(ast.Constant(value=None))
+    patch_file("playwright-python/playwright/_impl/_browser_type.py", browser_type_tree)
+
 # Patching playwright/_impl/_driver.py
 with open("playwright-python/playwright/_impl/_driver.py") as f:
     driver_source = f.read()
@@ -449,6 +485,23 @@ with open("playwright-python/playwright/async_api/_generated.py") as f:
                                                            ctx=ast.Load())
                                             )
                             )
+        if isinstance(class_node, ast.ClassDef) and class_node.name in ["Browser", "BrowserType"]:
+            for node in class_node.body:
+                if isinstance(node, ast.AsyncFunctionDef) and (node.name in ["new_context", "new_page", "launch_persistent_context"]):
+                    new_arg = ast.arg(arg="focus_control", annotation=ast.Subscript(
+                        value=ast.Name(id="typing.Optional", ctx=ast.Load()),
+                        slice=ast.Name(id="bool", ctx=ast.Load()),
+                        ctx=ast.Load(),
+                    ))
+                    # Append the argument to kwonlyargs
+                    node.args.kwonlyargs.append(new_arg)
+                    node.args.kw_defaults.append(ast.Constant(value=None))
+
+                    for subnode in ast.walk(node):
+                        if isinstance(subnode, ast.Call) and subnode.func.attr == node.name:
+                            subnode.keywords.append(
+                                ast.keyword(arg="focusControl", value=ast.Name(id="focus_control", ctx=ast.Load()))
+                            )
 
     patch_file("playwright-python/playwright/async_api/_generated.py", async_generated_tree)
 
@@ -478,6 +531,24 @@ with open("playwright-python/playwright/sync_api/_generated.py") as f:
                                             value=ast.Name(id="isolated_context",
                                                            ctx=ast.Load())
                                             )
+                            )
+
+        if isinstance(class_node, ast.ClassDef) and class_node.name in ["Browser", "BrowserType", "BrowserContext"]:
+            for node in class_node.body:
+                if isinstance(node, ast.FunctionDef) and (node.name in ["new_context", "new_page", "launch_persistent_context"]):
+                    new_arg = ast.arg(arg="focus_control", annotation=ast.Subscript(
+                        value=ast.Name(id="typing.Optional", ctx=ast.Load()),
+                        slice=ast.Name(id="bool", ctx=ast.Load()),
+                        ctx=ast.Load(),
+                    ))
+                    # Append the argument to kwonlyargs
+                    node.args.kwonlyargs.append(new_arg)
+                    node.args.kw_defaults.append(ast.Constant(value=None))
+
+                    for subnode in ast.walk(node):
+                        if isinstance(subnode, ast.Call) and subnode.func.attr == node.name:
+                            subnode.keywords.append(
+                                ast.keyword(arg="focusControl", value=ast.Name(id="focus_control", ctx=ast.Load()))
                             )
 
     patch_file("playwright-python/playwright/sync_api/_generated.py", async_generated_tree)

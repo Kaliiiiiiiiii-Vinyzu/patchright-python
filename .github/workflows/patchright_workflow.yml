@@ -8,7 +8,7 @@ on:
         description: 'Playwright Version (Base)'
         default: ''
       patchright_release:
-        description: 'Patchright Release Version'
+        description: 'Patchright Release Version (e.g. `1.55.2`)'
         default: ''
   # running every hour
   schedule:
