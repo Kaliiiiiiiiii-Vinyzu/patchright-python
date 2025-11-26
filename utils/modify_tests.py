@@ -5,6 +5,8 @@ import itertools
 files_to_skip = [
     # Console Domain Disabled
     'test_console.py',
+    "test_page_event_console.py",
+    "test_page_event_pageerror.py",
 
     # https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/issues/31
     'test_route_web_socket.py'
