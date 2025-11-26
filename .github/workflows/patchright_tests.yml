@@ -27,7 +27,7 @@ jobs:
 
       - name: Install Playwright-Python Package
         run: |
-          git clone https://github.com/microsoft/playwright-python --branch $(curl --silent "https://api.github.com/repos/Kaliiiiiiiiii-Vinyzu/patchright/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+          git clone https://github.com/microsoft/playwright-python --branch $(curl --silent "https://api.github.com/repos/Kaliiiiiiiiii-Vinyzu/patchright-python/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
           cd playwright-python
           python -m pip install --upgrade pip
           pip install -r local-requirements.txt
