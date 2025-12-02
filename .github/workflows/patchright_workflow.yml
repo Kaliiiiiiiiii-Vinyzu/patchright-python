@@ -91,8 +91,8 @@ jobs:
         if: steps.version_check.outputs.proceed == 'true'
         uses: actions/create-release@v1
         with:
-          tag_name: ${{ env.playwright_version }}
-          release_name: ${{ env.playwright_version }}
+          tag_name: ${{ env.patchright_release || env.playwright_version }}
+          release_name: ${{ env.patchright_release || env.playwright_version }}
           body: |
             This is an automatic deployment in response to a new release of [microsoft/playwright-python](https://github.com/microsoft/playwright-python).
             This Release is only used for Versioning.

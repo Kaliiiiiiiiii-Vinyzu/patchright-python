@@ -27,7 +27,7 @@ jobs:
 
       - name: Install Playwright-Python Package
         run: |
-          git clone https://github.com/microsoft/playwright-python --branch $(curl --silent "https://api.github.com/repos/Kaliiiiiiiiii-Vinyzu/patchright-python/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+          git clone https://github.com/microsoft/playwright-python --branch $(curl --silent "https://api.github.com/repos/StudentWan/phantomwright-driver-python/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
           cd playwright-python
           python -m pip install --upgrade pip
           pip install -r local-requirements.txt
@@ -50,11 +50,11 @@ jobs:
       - name: Install Local Patchright Package
         run: |
           cd playwright-python
-          pip install dist/patchright-*-manylinux1_x86_64.whl
+          pip install dist/phantomwright_driver-*-manylinux1_x86_64.whl
 
       - name: Install Playwright Browsers
         run: |
-          python -m patchright install --with-deps chromium
+          python -m phantomwright_driver install --with-deps chromium
 
       - name: Clone Playwright-Python Tests
         run: |

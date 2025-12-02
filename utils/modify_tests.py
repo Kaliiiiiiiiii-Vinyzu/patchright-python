@@ -96,9 +96,9 @@ def process_file(file_path):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name.startswith("playwright"):
-                    alias.name = alias.name.replace("playwright", "patchright", 1)
+                    alias.name = alias.name.replace("playwright", "phantomwright_driver", 1)
         if isinstance(node, ast.ImportFrom) and node.module.startswith("playwright"):
-            node.module = node.module.replace("playwright", "patchright", 1)
+            node.module = node.module.replace("playwright", "phantomwright_driver", 1)
 
         # Skip Tests Documented: https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/issues/31
         if isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef):
@@ -144,7 +144,7 @@ def main():
         conftest_content = read_f.read()
         updated_conftest_content = conftest_content.replace(
             "Path(inspect.getfile(playwright)).parent",
-            "Path(inspect.getfile(patchright)).parent"
+            "Path(inspect.getfile(phantomwright_driver)).parent"
         )
 
         with open("./tests/conftest.py", "w") as write_f:
