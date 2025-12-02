@@ -4,7 +4,7 @@ import os
 
 import toml
 
-patchright_version = os.environ.get('patchright_release') or os.environ.get('playwright_version')
+phantomwright_driver_version = os.environ.get('patchright_release') or os.environ.get('playwright_version')
 
 def patch_file(file_path: str, patched_tree: ast.AST) -> None:
     with open(file_path, "w") as f:
@@ -12,28 +12,27 @@ def patch_file(file_path: str, patched_tree: ast.AST) -> None:
 
 # Adding _repo_version.py (Might not be intended but fixes the build)
 with open("playwright-python/playwright/_repo_version.py", "w") as f:
-    f.write(f"version = '{patchright_version}'")
+    f.write(f"version = '{phantomwright_driver_version}'")
 
 # Patching pyproject.toml
 with open("playwright-python/pyproject.toml", "r") as f:
     pyproject_source = toml.load(f)
 
-    pyproject_source["project"]["name"] = "patchright"
+    pyproject_source["project"]["name"] = "phantomwright-driver"
     pyproject_source["project"]["description"] = "Undetected Python version of the Playwright testing and automation library."
     pyproject_source["project"]["authors"] = [{'name': 'Microsoft Corporation, patched by github.com/Kaliiiiiiiiii-Vinyzu/'}]
 
-    pyproject_source["project"]["urls"]["homepage"] = "https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python"
-    pyproject_source["project"]["urls"]["Release notes"] = "https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python/releases"
-    pyproject_source["project"]["urls"]["Bug Reports"] = "https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python/issues"
-    pyproject_source["project"]["urls"]["homeSource Codepage"] = "https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python"
+    pyproject_source["project"]["urls"]["homepage"] = "https://github.com/StudentWan/phantomwright-driver-python"
+    pyproject_source["project"]["urls"]["Release notes"] = "https://github.com/StudentWan/phantomwright-driver-python/releases"
+    pyproject_source["project"]["urls"]["Bug Reports"] = "https://github.com/StudentWan/phantomwright-driver-python/issues"
+    pyproject_source["project"]["urls"]["homeSource Codepage"] = "https://github.com/StudentWan/phantomwright-driver-python"
 
     del pyproject_source["project"]["scripts"]["playwright"]
-    pyproject_source["project"]["scripts"]["patchright"] = "patchright.__main__:main"
-    pyproject_source["project"]["entry-points"]["pyinstaller40"]["hook-dirs"] = "patchright._impl.__pyinstaller:get_hook_dirs"
+    pyproject_source["project"]["scripts"]["phantomwright_driver"] = "phantomwright_driver.__main__:main"
+    pyproject_source["project"]["entry-points"]["pyinstaller40"]["hook-dirs"] = "phantomwright_driver._impl.__pyinstaller:get_hook_dirs"
 
-    pyproject_source["tool"]["setuptools"]["packages"] = ['patchright', 'patchright.async_api', 'patchright.sync_api', 'patchright._impl', 'patchright._impl.__pyinstaller']
-    pyproject_source["tool"]["setuptools_scm"] = {'version_file': 'patchright/_repo_version.py'}
-
+    pyproject_source["tool"]["setuptools"]["packages"] = ['phantomwright_driver', 'phantomwright_driver.async_api', 'phantomwright_driver.sync_api', 'phantomwright_driver._impl', 'phantomwright_driver._impl.__pyinstaller']
+    pyproject_source["tool"]["setuptools_scm"] = {'version_file': 'phantomwright_driver/_repo_version.py'}
     with open("playwright-python/pyproject.toml", "w") as f:
         toml.dump(pyproject_source, f)
 
@@ -53,7 +52,7 @@ with open("playwright-python/setup.py") as f:
             if node.targets[0].id == "url" and node.value.value == "https://playwright.azureedge.net/builds/driver/":
                 node.value = ast.JoinedStr(
                     values=[
-                        ast.Constant(value='https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/releases/download/v'),
+                        ast.Constant(value='https://github.com/StudentWan/phantomwright-driver/releases/download/v'),
                         ast.FormattedValue(value=ast.Name(id='driver_version', ctx=ast.Load()), conversion=-1),
                         ast.Constant(value='/')
                     ]
@@ -67,34 +66,34 @@ with open("playwright-python/setup.py") as f:
         # Modify Shutil Call
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and len(node.args) >= 1 and isinstance(node.args[0], ast.Constant):
             if node.func.value.id == "shutil" and node.func.attr == "rmtree" and node.args[0].value == "playwright.egg-info":
-                node.args[0].value = "patchright.egg-info"
+                node.args[0].value = "phantomwright_driver.egg-info"
 
         # Modify Os Makedirs Call
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and len(node.args) >= 1 and isinstance(node.args[0], ast.Constant):
             if node.func.value.id == "os" and node.func.attr == "makedirs" and node.args[0].value == "playwright/driver":
-                node.args[0].value = "patchright/driver"
+                node.args[0].value = "phantomwright_driver/driver"
 
         # Modify Zip Write Call
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and len(node.args) >= 2 and isinstance(node.args[1], ast.JoinedStr):
             if node.func.value.id == "zip" and node.func.attr == "write" and node.args[1].values[0].value == "playwright/driver/":
-                node.args[1].values[0].value = "patchright/driver/"
+                node.args[1].values[0].value = "phantomwright_driver/driver/"
 
         # Modify Zip Writestr Call
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and len(node.args) >= 1 and isinstance(node.args[0], ast.Constant):
             if node.func.value.id == "zip" and node.func.attr == "writestr" and node.args[0].value == "playwright/driver/README.md":
-                node.args[0].value = "patchright/driver/README.md"
+                node.args[0].value = "phantomwright_driver/driver/README.md"
 
         # Modify Extractall Call
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and len(node.args) >= 2 and isinstance(node.args[1], ast.Constant):
             if node.func.id == "extractall" and node.args[1].value == "playwright/driver":
-                node.args[1].value = "patchright/driver"
+                node.args[1].value = "phantomwright_driver/driver"
 
         # Modify Setup Call
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             if node.func.id == "setup":
                 node.keywords.append(ast.keyword(
                     arg="version",
-                    value=ast.Constant(value=patchright_version)
+                    value=ast.Constant(value=phantomwright_driver_version)
                 ))
 
     patch_file("playwright-python/setup.py", setup_tree)
@@ -107,7 +106,7 @@ with open("playwright-python/playwright/_impl/__pyinstaller/hook-playwright.asyn
     for node in ast.walk(async_api_tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and len(node.args) == 1 and isinstance(node.args[0], ast.Constant):
             if node.func.id == "collect_data_files" and node.args[0].value == "playwright":
-                node.args[0].value = "patchright"
+                node.args[0].value = "phantomwright_driver"
 
     patch_file("playwright-python/playwright/_impl/__pyinstaller/hook-playwright.async_api.py", async_api_tree)
 
@@ -119,7 +118,7 @@ with open("playwright-python/playwright/_impl/__pyinstaller/hook-playwright.sync
     for node in ast.walk(async_api_tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and len(node.args) == 1 and isinstance(node.args[0], ast.Constant):
             if node.func.id == "collect_data_files" and node.args[0].value == "playwright":
-                node.args[0].value = "patchright"
+                node.args[0].value = "phantomwright_driver"
 
     patch_file("playwright-python/playwright/_impl/__pyinstaller/hook-playwright.sync_api.py", async_api_tree)
 
@@ -167,7 +166,7 @@ with open("playwright-python/playwright/_impl/_driver.py") as f:
     for node in ast.walk(driver_tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and len(node.args) >= 1 and isinstance(node.args[0], ast.Name):
             if node.func.value.id == "inspect" and node.func.attr == "getfile" and node.args[0].id == "playwright":
-                node.args[0].id = "patchright"
+                node.args[0].id = "phantomwright_driver"
 
     patch_file("playwright-python/playwright/_impl/_driver.py", driver_tree)
 
@@ -179,11 +178,11 @@ with open("playwright-python/playwright/_impl/_connection.py") as f:
     for node in ast.walk(connection_source_tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and len(node.args) >= 1 and isinstance(node.args[0], ast.Attribute):
             if node.func.id == "Path" and node.args[0].value.id == "playwright":
-                node.args[0].value.id = "patchright"
+                node.args[0].value.id = "phantomwright_driver"
 
         elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Attribute) and isinstance(node.value.value, ast.Attribute) and isinstance(node.value.value.value, ast.Name):
             if node.value.value.value.id == "playwright" and node.value.value.attr == "_impl" and node.value.attr == "_impl_to_api_mapping":
-                node.value.value.value.id = "patchright"
+                node.value.value.value.id = "phantomwright_driver"
 
     patch_file("playwright-python/playwright/_impl/_connection.py", connection_source_tree)
 
@@ -316,7 +315,7 @@ with open("playwright-python/playwright/_impl/_browser_context.py") as f:
             node.body.append(
                 ast.parse("""\
 async def install_inject_route(self) -> None:
-    from patchright._impl._impl_to_api_mapping import ImplToApiMapping
+    from phantomwright_driver._impl._impl_to_api_mapping import ImplToApiMapping
     mapping = ImplToApiMapping()
 
     async def route_handler(route: Route) -> None:
@@ -370,7 +369,7 @@ with open("playwright-python/playwright/_impl/_page.py") as f:
             node.body.append(
                 ast.parse("""\
 async def install_inject_route(self) -> None:
-    from patchright._impl._impl_to_api_mapping import ImplToApiMapping
+    from phantomwright_driver._impl._impl_to_api_mapping import ImplToApiMapping
     mapping = ImplToApiMapping()
     
     async def route_handler(route: Route) -> None:
@@ -568,19 +567,17 @@ for python_file in glob.glob("playwright-python/playwright/**.py") + glob.glob("
                     if alias.name.startswith("playwright"):
                         if "__init__" in python_file:
                             renamed_attributes.append(alias.name)
-                        alias.name = alias.name.replace("playwright", "patchright", 1)
+                        alias.name = alias.name.replace("playwright", "phantomwright_driver", 1)
             if isinstance(node, ast.ImportFrom) and node.module.startswith("playwright"):
-                node.module = node.module.replace("playwright", "patchright", 1)
+                node.module = node.module.replace("playwright", "phantomwright_driver", 1)
             if renamed_attributes and isinstance(node, ast.Attribute):
                 unparsed_attribute = ast.unparse(node.value)
                 if unparsed_attribute in renamed_attributes:
-                    node.value = ast.parse(unparsed_attribute.replace("playwright", "patchright", 1)).body[0].value
-
+                    node.value = ast.parse(unparsed_attribute.replace("playwright", "phantomwright_driver", 1)).body[0].value
         patch_file(python_file, file_tree)
 
 # Rename the Package Folder to Patchright
-os.rename("playwright-python/playwright", "playwright-python/patchright")
-
+os.rename("playwright-python/playwright", "playwright-python/phantomwright_driver")
 # Write the Projects README to the README which is used in the release
 with open("README.md", 'r') as src:
     with open("playwright-python/README.md", 'w') as dst:
