@@ -1,4 +1,4 @@
-name: PatchRight-Python Workflow
+name: Patchright Release Workflow
 
 on:
   # enabling manual trigger
@@ -12,43 +12,29 @@ on:
         default: ''
   # running every hour
   schedule:
-    - cron: '48 * * * *'
-
-
-permissions:
-  actions: none
-  attestations: none
-  checks: none
-  contents: write
-  deployments: none
-  id-token: write # For trusted Publishing
-  issues: none
-  discussions: none
-  packages: none
-  pages: none
-  pull-requests: none
-  repository-projects: none
-  security-events: none
-  statuses: none
-
+    - cron: '0 * * * *'
 
 env:
   REPO: ${{ github.repository }}
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  patchright-workflow:
+  patchright-release-workflow:
     name: "Patchright-Python Workflow: Install, Patch, Build and Publish Patchright Python Package"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/patchright
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install
 
       - name: Check Release Version
         id: version_check
@@ -65,26 +51,24 @@ jobs:
       - name: Install Playwright-Python Package
         if: steps.version_check.outputs.proceed == 'true'
         run: |
+          uv sync --all-groups
           git clone https://github.com/microsoft/playwright-python --branch ${{ env.playwright_version }}
           cd playwright-python
-          python -m pip install --upgrade pip
-          pip install -r local-requirements.txt
-          pip install -e .
-          pip install black toml
+          uv add -r local-requirements.txt
 
       - name: Patch Playwright-Python Package
         if: steps.version_check.outputs.proceed == 'true'
         run: |
-          python patch_python_package.py
-          python -m black playwright-python
+          uv run patch_python_package.py
+          uvx ruff format playwright-python
 
       - name: Build Patchright-Python Package
         if: steps.version_check.outputs.proceed == 'true'
         run: |
           cd playwright-python
-          pip install -e .
+          uv pip install -e .
           for wheel in $(python setup.py --list-wheels); do
-            PLAYWRIGHT_TARGET_WHEEL=$wheel python -m build --wheel
+            PLAYWRIGHT_TARGET_WHEEL=$wheel uv build --wheel
           done
 
       - name: Create Empty Versioning Release

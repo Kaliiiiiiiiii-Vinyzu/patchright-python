@@ -8,53 +8,48 @@ on:
     branches: [main]
 
 jobs:
-  run-playwright-tests:
+  run-patchright-tests:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install pytest
+          uv python install
 
       - name: Install Playwright-Python Package
         run: |
+          uv sync --all-groups
           git clone https://github.com/microsoft/playwright-python --branch $(curl --silent "https://api.github.com/repos/Kaliiiiiiiiii-Vinyzu/patchright-python/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
           cd playwright-python
-          python -m pip install --upgrade pip
-          pip install -r local-requirements.txt
-          pip install -e .
-          pip install black toml
+          uv add -r local-requirements.txt
 
       - name: Patch Playwright-Python Package
         run: |
-          python patch_python_package.py
-          python -m black playwright-python
+          uv run patch_python_package.py
+          uvx ruff format playwright-python
 
       - name: Build Patchright-Python Package
         run: |
           cd playwright-python
-          pip install -e .
+          uv pip install -e .
           for wheel in $(python setup.py --list-wheels); do
-            PLAYWRIGHT_TARGET_WHEEL=$wheel python -m build --wheel
+            PLAYWRIGHT_TARGET_WHEEL=$wheel uv build --wheel
           done
 
       - name: Install Local Patchright Package
         run: |
           cd playwright-python
-          pip install dist/patchright-*-manylinux1_x86_64.whl
+          uv pip install dist/patchright-*-manylinux1_x86_64.whl
 
-      - name: Install Playwright Browsers
+      - name: Install Chromium with Patchright
         run: |
-          python -m patchright install --with-deps chromium
+          uv run patchright install --with-deps chromium
 
       - name: Clone Playwright-Python Tests
         run: |
@@ -62,9 +57,9 @@ jobs:
 
       - name: Modify Tests
         run: |
-          python utils/modify_tests.py
+          uv run utils/modify_tests.py
 
       - name: Run Chromium Tests
         run: |
-          xvfb-run pytest --browser=chromium --disable-warnings --timeout 90 tests/sync/
-          xvfb-run pytest --browser=chromium --disable-warnings --timeout 90 tests/async/
+          xvfb-run -a uv run pytest --browser=chromium --disable-warnings --timeout 90 tests/sync/
+          xvfb-run -a uv run pytest --browser=chromium --disable-warnings --timeout 90 tests/async/

@@ -165,3 +165,7 @@ cython_debug/
 # Playwright Tests
 playwright-python/
 tests/
+dev_test.py
+
+# UV
+uv.lock

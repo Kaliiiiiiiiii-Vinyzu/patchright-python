@@ -1,4 +1,9 @@
-# Only for test Runs
+# Only for test Runs, does not relate to actual Patchright package
+[project]
+name = "patchright-tests"
+version = "1.0.0"
+requires-python = ">=3.11"
+
 [tool.pytest.ini_options]
 addopts = "-Wall -rsx" #  -s
 markers = [
@@ -11,3 +16,18 @@ junit_family = "xunit2"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
+
+[dependency-groups]
+dev = [
+    "autobahn>=25.12.2",
+    "patchright>=1.56.0",
+    "pillow>=12.0.0",
+    "pixelmatch>=0.3.0",
+    "pyopenssl>=25.3.0",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "pytest-timeout>=2.4.0",
+    "requests>=2.32.5",
+    "twisted>=25.5.0",
+    "toml>=0.10.0"
+]
