@@ -26,6 +26,7 @@ jobs:
       url: https://pypi.org/p/patchright
     permissions:
       contents: write
+      id-token: write # For trusted Publishing
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
