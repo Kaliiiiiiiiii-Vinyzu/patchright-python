@@ -75,6 +75,8 @@ jobs:
       - name: Create Empty Versioning Release
         if: steps.version_check.outputs.proceed == 'true'
         uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ env.playwright_version }}
           release_name: ${{ env.playwright_version }}
