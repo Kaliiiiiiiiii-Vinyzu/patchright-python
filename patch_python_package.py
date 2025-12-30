@@ -582,7 +582,7 @@ for python_file in glob.glob("playwright-python/playwright/**.py") + glob.glob("
 os.rename("playwright-python/playwright", "playwright-python/patchright")
 
 # Write the Projects README to the README which is used in the release
-with open("README.md", 'r') as src:
-    with open("playwright-python/README.md", 'w') as dst:
+with open("README.md", 'r', encoding='utf-8') as src:
+    with open("playwright-python/README.md", 'w', encoding='utf-8') as dst:
         # Read from the source readme and write to the destination readme
         dst.write(src.read())

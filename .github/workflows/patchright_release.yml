@@ -54,8 +54,7 @@ jobs:
         run: |
           uv sync --all-groups
           git clone https://github.com/microsoft/playwright-python --branch ${{ env.playwright_version }}
-          cd playwright-python
-          uv add -r local-requirements.txt
+          uv add -r playwright-python/local-requirements.txt --dev
 
       - name: Patch Playwright-Python Package
         if: steps.version_check.outputs.proceed == 'true'
@@ -66,9 +65,9 @@ jobs:
       - name: Build Patchright-Python Package
         if: steps.version_check.outputs.proceed == 'true'
         run: |
+          uv pip install -e playwright-python
           cd playwright-python
-          uv pip install -e .
-          for wheel in $(python setup.py --list-wheels); do
+          for wheel in $(uv run setup.py --list-wheels); do
             PLAYWRIGHT_TARGET_WHEEL=$wheel uv build --wheel
           done
 
