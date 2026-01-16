@@ -376,8 +376,12 @@ async def install_inject_route(self) -> None:
     async def route_handler(route: Route) -> None:
             try:
                 if route.request.resource_type == "document" and route.request.url.startswith("http"):
-                    protocol = route.request.url.split(":")[0]
-                    await route.fallback(url=f"{protocol}://patchright-init-script-inject.internal/")
+                    # FIX: Remove redirect to non-existent .internal domain
+                    # Original code caused ERR_NAME_NOT_RESOLVED:
+                    # protocol = route.request.url.split(":")[0]
+                    # await route.fallback(url=f"{protocol}://patchright-init-script-inject.internal/")
+                    # Fixed: Just continue the request normally
+                    await route.continue_()
                 else:
                     await route.fallback()
             except:
