@@ -50,7 +50,7 @@ with open("playwright-python/setup.py") as f:
 
         # Modify url
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.targets[0], ast.Name):
-            if node.targets[0].id == "url" and node.value.value == "https://playwright.azureedge.net/builds/driver/":
+            if node.targets[0].id == "url" and node.value.value == "https://cdn.playwright.dev/builds/driver/":
                 node.value = ast.JoinedStr(
                     values=[
                         ast.Constant(value='https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/releases/download/v'),

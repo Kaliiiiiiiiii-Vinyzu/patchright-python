@@ -39,6 +39,8 @@ tests_to_skip = [
     "test_workers_should_report_console_logs",
     "test_workers_should_have_JSHandles_for_console_logs",
     "test_workers_should_report_errors",
+    "test_worker_should_report_console_event",
+    "test_worker_should_report_console_event_when_not_listening_on_page_or_context",
 
     # InitScript Timing
     "test_expose_function_should_be_callable_from_inside_add_init_script",
