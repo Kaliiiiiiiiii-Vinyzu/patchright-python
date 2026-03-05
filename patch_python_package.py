@@ -464,7 +464,7 @@ with open("playwright-python/playwright/async_api/_generated.py") as f:
     async_generated_tree = ast.parse(async_generated_source)
 
     for class_node in ast.walk(async_generated_tree):
-        if isinstance(class_node, ast.ClassDef) and class_node.name in ["Page", "Frame", "Worker", "Locator"]:
+        if isinstance(class_node, ast.ClassDef) and class_node.name in ["Page", "Frame", "Worker", "Locator", "JSHandle"]:
             for node in class_node.body:
                 if isinstance(node, ast.AsyncFunctionDef) and (node.name in ["evaluate", "evaluate_handle"] or (class_node.name == "Locator" and node.name == "evaluate_all")):  # , "evaluate_all"
                     new_arg = ast.arg(arg="isolated_context", annotation=ast.Subscript(
@@ -511,7 +511,7 @@ with open("playwright-python/playwright/sync_api/_generated.py") as f:
     async_generated_tree = ast.parse(async_generated_source)
 
     for class_node in ast.walk(async_generated_tree):
-        if isinstance(class_node, ast.ClassDef) and class_node.name in ["Page", "Frame", "Worker", "Locator"]:
+        if isinstance(class_node, ast.ClassDef) and class_node.name in ["Page", "Frame", "Worker", "Locator", "JSHandle"]:
             for node in class_node.body:
                 if isinstance(node, ast.FunctionDef) and (node.name in ["evaluate", "evaluate_handle"] or (class_node.name == "Locator" and node.name == "evaluate_all")): # , "evaluate_all"
                     new_arg = ast.arg(arg="isolated_context", annotation=ast.Subscript(
