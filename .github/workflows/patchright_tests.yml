@@ -50,12 +50,11 @@ jobs:
 
       - name: Install Local Patchright Package
         run: |
-          cd playwright-python
-          uv pip install dist/patchright-*-manylinux1_x86_64.whl
+          uv pip install --python .venv/bin/python playwright-python/dist/patchright-*-manylinux1_x86_64.whl
 
       - name: Install Chromium with Patchright
         run: |
-          uv run patchright install --with-deps chromium
+          uv run --no-sync patchright install --with-deps chromium
 
       - name: Clone Playwright-Python Tests
         run: |
@@ -63,9 +62,9 @@ jobs:
 
       - name: Modify Tests
         run: |
-          uv run utils/modify_tests.py
+          uv run --no-sync utils/modify_tests.py
 
       - name: Run Chromium Tests
         run: |
-          xvfb-run -a uv run pytest --browser=chromium --disable-warnings --timeout 90 tests/sync/
-          xvfb-run -a uv run pytest --browser=chromium --disable-warnings --timeout 90 tests/async/
+          xvfb-run -a uv run --no-sync pytest --browser=chromium --disable-warnings --timeout 90 tests/sync/
+          xvfb-run -a uv run --no-sync pytest --browser=chromium --disable-warnings --timeout 90 tests/async/
