@@ -41,19 +41,34 @@ jobs:
         id: version_check
         run: |
           echo "patchright_release=${{ github.event.inputs.patchright_release }}" >> $GITHUB_ENV
+          PLAYWRIGHT_VERSION=""
           if [ -n "${{ github.event.inputs.version }}" ]; then
+            PLAYWRIGHT_VERSION="${{ github.event.inputs.version }}"
             echo "proceed=true" >>$GITHUB_OUTPUT
-            echo "playwright_version=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+            echo "playwright_version=$PLAYWRIGHT_VERSION" >> $GITHUB_ENV
           else
             chmod +x utils/release_version_check.sh
             utils/release_version_check.sh
+            PLAYWRIGHT_VERSION=$(grep '^playwright_version=' "$GITHUB_ENV" | tail -n1 | cut -d= -f2-)
+          fi
+          if [ -n "$PLAYWRIGHT_VERSION" ]; then
+            echo "playwright_version=$PLAYWRIGHT_VERSION" >> $GITHUB_OUTPUT
           fi
 
       - name: Install Playwright-Python Package
         if: steps.version_check.outputs.proceed == 'true'
         run: |
           uv sync --all-groups
-          git clone https://github.com/microsoft/playwright-python --branch ${{ env.playwright_version }}
+          if [ -n "$patchright_release" ]; then
+            PATCHRIGHT_RELEASE="$patchright_release"
+          else
+            PLAYWRIGHT_MINOR=${playwright_version#v}
+            PLAYWRIGHT_MINOR=${PLAYWRIGHT_MINOR%.*}
+            PATCHRIGHT_RELEASE=$(curl -fsSL "https://api.github.com/repos/Kaliiiiiiiiii-Vinyzu/patchright/releases?per_page=100" | jq -r --arg minor "$PLAYWRIGHT_MINOR" '[.[].tag_name | ltrimstr("v") | select(startswith($minor + ".")) | select((try (split(".") | map(tonumber) | length) catch 0) == 3)] | sort_by(split(".") | map(tonumber)) | last')
+            test -n "$PATCHRIGHT_RELEASE" -a "$PATCHRIGHT_RELEASE" != "null"
+          fi
+          echo "patchright_release=$PATCHRIGHT_RELEASE" >> $GITHUB_ENV
+          git clone https://github.com/microsoft/playwright-python --branch "$playwright_version"
           uv add -r playwright-python/local-requirements.txt --dev
 
       - name: Patch Playwright-Python Package
@@ -65,8 +80,8 @@ jobs:
       - name: Build Patchright-Python Package
         if: steps.version_check.outputs.proceed == 'true'
         run: |
-          uv pip install -e playwright-python
           cd playwright-python
+          uv pip install -e .
           for wheel in $(uv run setup.py --list-wheels); do
             PLAYWRIGHT_TARGET_WHEEL=$wheel uv build --wheel
           done
@@ -77,8 +92,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.playwright_version }}
-          release_name: ${{ env.playwright_version }}
+          tag_name: ${{ steps.version_check.outputs.playwright_version }}
+          release_name: ${{ steps.version_check.outputs.playwright_version }}
           body: |
             This is an automatic deployment in response to a new release of [microsoft/playwright-python](https://github.com/microsoft/playwright-python).
             This Release is only used for Versioning.

@@ -44,7 +44,7 @@ jobs:
         run: |
           cd playwright-python
           uv pip install -e .
-          for wheel in $(python setup.py --list-wheels); do
+          for wheel in $(uv run setup.py --list-wheels); do
             PLAYWRIGHT_TARGET_WHEEL=$wheel uv build --wheel
           done
 
