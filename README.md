@@ -120,6 +120,7 @@ playwright.chromium.launch_persistent_context(
 > [!NOTE]  
 > We recommend using Google Chrome instead of Chromium.
 > You can install it via `patchright install chrome` (or via any other installation method) and use it with `channel="chrome"`.
+> On MacOS M1/M2/M3, make sure you launch in `arm64` environment (e.g., `arch -arm64 zsh`). Otherwise, the browser performance will slow down significantly.
 
 ---
 
