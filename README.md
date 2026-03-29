@@ -39,6 +39,8 @@
 <details open>
     <summary><h3>Sponsors</h1></summary>
 
+<sup>Want to Sponsor this Project? [Contact Me](https://discordapp.com/users/935224495126487150)!</sup>
+
 </details>
 
 ---
