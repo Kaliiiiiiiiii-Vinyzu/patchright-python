@@ -51,7 +51,7 @@ with open("playwright-python/setup.py") as f:
 
         # Modify url
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.targets[0], ast.Name):
-            if node.targets[0].id == "url" and node.value.value == "https://cdn.playwright.dev/builds/driver/":
+            if node.targets[0].id == "url" and node.value.value in ("https://cdn.playwright.dev/builds/driver/", "https://playwright.azureedge.net/builds/driver/"):
                 node.value = ast.JoinedStr(
                     values=[
                         ast.Constant(value='https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/releases/download/v'),
@@ -578,6 +578,56 @@ for python_file in glob.glob("playwright-python/playwright/**.py") + glob.glob("
                     node.value = ast.parse(unparsed_attribute.replace("playwright", "patchright", 1)).body[0].value
 
         patch_file(python_file, file_tree)
+
+# Patching setup.py to add networkidle captcha blacklisting
+# This injects a function that patches the driver's frames.js after extraction
+# to exclude captcha polling requests from networkidle calculations
+with open("playwright-python/setup.py") as f:
+    setup_code = f.read()
+
+NETWORKIDLE_PATCH_CODE = '''
+import re as _re
+
+_CAPTCHA_PATTERNS_JS = '["challenges.cloudflare.com","google.com/recaptcha","www.gstatic.com/recaptcha","hcaptcha.com","api.funcaptcha.com","client-api.arkoselabs.com"]'
+_PATCH_MARKER = '// [patchright-networkidle-blacklist]'
+_CAPTCHA_CHECK = f'const _reqUrl = request.url();\\n    if ({_CAPTCHA_PATTERNS_JS}.some(p => _reqUrl.includes(p)))\\n      return;'
+
+def _patch_networkidle_blacklist(driver_root):
+    for dirpath, _, filenames in os.walk(driver_root):
+        for f in filenames:
+            if f == 'frames.js' and 'server' in dirpath:
+                fpath = os.path.join(dirpath, f)
+                code = open(fpath).read()
+                if _PATCH_MARKER in code:
+                    return
+                for method in ['_inflightRequestStarted', '_inflightRequestFinished']:
+                    pat = _re.compile(rf'({method}\\(request\\) \\{{[^}}]*?if \\(request\\._isFavicon\\)\\s*return;)', _re.DOTALL)
+                    m = pat.search(code)
+                    if m:
+                        code = code.replace(m.group(1), m.group(1) + f'\\n    {_PATCH_MARKER}\\n    {_CAPTCHA_CHECK}', 1)
+                open(fpath, 'w').write(code)
+                print(f'Patched networkidle blacklist: {fpath}')
+                return
+'''
+
+# Insert the function definition near the top (after imports)
+# and add calls after each extractall in _build_wheel and _download_and_extract_local_driver
+setup_code = NETWORKIDLE_PATCH_CODE + setup_code
+
+# Add _patch_networkidle_blacklist call after extraction in _build_wheel
+setup_code = setup_code.replace(
+    "extractall(zip, f\"driver/{wheel_bundle['zip_name']}\")",
+    "extractall(zip, f\"driver/{wheel_bundle['zip_name']}\")\n        _patch_networkidle_blacklist(f\"driver/{wheel_bundle['zip_name']}\")"
+)
+
+# Add _patch_networkidle_blacklist call after extraction in _download_and_extract_local_driver
+setup_code = setup_code.replace(
+    "extractall(zip, 'patchright/driver')",
+    "extractall(zip, 'patchright/driver')\n        _patch_networkidle_blacklist('patchright/driver')"
+)
+
+with open("playwright-python/setup.py", "w") as f:
+    f.write(setup_code)
 
 # Rename the Package Folder to Patchright
 os.rename("playwright-python/playwright", "playwright-python/patchright")
