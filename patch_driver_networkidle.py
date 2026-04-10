@@ -16,7 +16,7 @@ import re
 import sys
 from pathlib import Path
 
-CAPTCHA_PATTERNS_JS = '["challenges.cloudflare.com","google.com/recaptcha","www.gstatic.com/recaptcha","hcaptcha.com","api.funcaptcha.com","client-api.arkoselabs.com"]'
+CAPTCHA_PATTERNS_JS = '["challenges.cloudflare.com","google.com/recaptcha","www.gstatic.com/recaptcha","hcaptcha.com","api.funcaptcha.com","client-api.arkoselabs.com","google-analytics.com","googletagmanager.com","analytics.google.com","hotjar.com","fullstory.com","logrocket.com","mouseflow.com","clarity.ms","browser-intake-datadoghq.com","sentry.io","newrelic.com","nr-data.net","forter.com","/heartbeat","/keepalive","/keep-alive","/beacon"]'
 
 CAPTCHA_CHECK = f"""const _reqUrl = request.url();
     if ({CAPTCHA_PATTERNS_JS}.some(p => _reqUrl.includes(p)))

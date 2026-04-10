@@ -588,9 +588,9 @@ with open("playwright-python/setup.py") as f:
 NETWORKIDLE_PATCH_CODE = '''
 import re as _re
 
-_CAPTCHA_PATTERNS_JS = '["challenges.cloudflare.com","google.com/recaptcha","www.gstatic.com/recaptcha","hcaptcha.com","api.funcaptcha.com","client-api.arkoselabs.com"]'
+_EXCLUDED_PATTERNS_JS = '["challenges.cloudflare.com","google.com/recaptcha","www.gstatic.com/recaptcha","hcaptcha.com","api.funcaptcha.com","client-api.arkoselabs.com","google-analytics.com","googletagmanager.com","analytics.google.com","hotjar.com","fullstory.com","logrocket.com","mouseflow.com","clarity.ms","browser-intake-datadoghq.com","sentry.io","newrelic.com","nr-data.net","forter.com","/heartbeat","/keepalive","/keep-alive","/beacon"]'
 _PATCH_MARKER = '// [patchright-networkidle-blacklist]'
-_CAPTCHA_CHECK = f'const _reqUrl = request.url();\\n    if ({_CAPTCHA_PATTERNS_JS}.some(p => _reqUrl.includes(p)))\\n      return;'
+_CAPTCHA_CHECK = f'const _reqUrl = request.url();\\n    if ({_EXCLUDED_PATTERNS_JS}.some(p => _reqUrl.includes(p)))\\n      return;'
 
 def _patch_networkidle_blacklist(driver_root):
     for dirpath, _, filenames in os.walk(driver_root):
