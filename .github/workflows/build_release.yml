@@ -87,7 +87,7 @@ jobs:
             - api.funcaptcha.com (Arkose Labs)
             - client-api.arkoselabs.com (Arkose Labs)
 
-            Install: `pip install patchright@https://github.com/Hackerbone/patchright-python/releases/download/v${{ github.event.inputs.patchright_release }}/patchright-${{ github.event.inputs.patchright_release }}-py3-none-manylinux1_x86_64.whl`
+            Install: `pip install patchright@https://github.com/bugbasesecurity/patchright-python/releases/download/v${{ github.event.inputs.patchright_release }}/patchright-${{ github.event.inputs.patchright_release }}-py3-none-manylinux1_x86_64.whl`
           files: dist/*.whl
           draft: false
           prerelease: false
