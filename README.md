@@ -41,6 +41,41 @@
 
 <sup>Want to Sponsor this Project? [Contact Me](https://discordapp.com/users/935224495126487150)!</sup>
 
+</br>
+
+[<img height="100" alt="swiftproxy banner" src="https://github.com/user-attachments/assets/123ac558-f99f-4c59-b826-b86822f2c92a" />](https://www.swiftproxy.net/?ref=Vinyzu)
+
+#### [Swiftproxy](https://www.swiftproxy.net/?ref=Vinyzu): High-Performance Residential Proxies for Scalable Data Collection
+
+Built for developers who need **reliable**, anti-detection proxy infrastructure. [Swiftproxy](https://www.swiftproxy.net/?ref=Vinyzu) delivers **stable connections**, **high success rates**, and flexible control for **large-scale scraping and automation**.
+
+- 🌍 195+ locations with ethically sourced residential IPs
+- 🔄 **Rotating** & **sticky sessions** with precise geo-targeting
+- ⚡ Optimized for **anti-ban** & **high success rate**
+- 🔌 HTTP / HTTPS / SOCKS5 support
+- 🧪 **Free 500MB trial** for testing
+- 💸 **Special discount** code for Patchright users: **PROXY90 - 10%**
+
+<sup> Best for: Web scraping, automation, multi-accounting, and large-scale data extraction </sup>
+
+---
+
+[<img height="90" alt="rapidproxy banner" src="https://github.com/user-attachments/assets/bb771788-5c99-4e22-be40-c99cca95db22" />](https://www.rapidproxy.io/?ref=Vinyzu)
+
+
+#### [RapidProxy](https://www.rapidproxy.io/?ref=Vinyzu) provides a stable and high-performance proxy network built for large-scale data operations.
+
+[RapidProxy](https://www.rapidproxy.io/?ref=Vinyzu) delivers:
+- 🌍 90M+ Residential IPs (200+ locations)
+- 🔄 **Rotating Residential Proxies** — from **$0.65/GB** (non-expiring traffic)
+- 🧩 **Static Residential IPs** — **$5/IP** (30 days, unlimited traffic)
+- 🎯 Precise geo-targeting
+- ⚡ **Free Trial Available** — test proxy performance risk-free
+- Built for scraping, automation, and high-performance data workflows.
+- 🔥 Special Offer: Use code **RAPID10** to get **10% off**
+
+<sup> Start fast. Scale globally. Stay stable with [RapidProxy](https://www.rapidproxy.io/?ref=Vinyzu). </sup>
+
 </details>
 
 ---
