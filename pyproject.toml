@@ -23,7 +23,6 @@ asyncio_default_test_loop_scope = "session"
 [dependency-groups]
 dev = [
     "autobahn>=25.12.2",
-    "patchright>=1.56.0",
     "pillow>=12.0.0",
     "pixelmatch>=0.3.0",
     "pyopenssl>=25.3.0",
