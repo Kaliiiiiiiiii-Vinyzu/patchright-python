@@ -3,6 +3,9 @@
 name = "patchright-tests"
 version = "1.0.0"
 requires-python = ">=3.11"
+dependencies = [
+    "patchright>=1.59.1",
+]
 
 [tool.pytest.ini_options]
 addopts = "-Wall -rsx" #  -s

@@ -142,17 +142,6 @@ def main():
     with open("./tests/assets/inject.html", "w") as f:
         f.write("<script>window.result = window.injected;</script>")
 
-    with open("./tests/conftest.py", "r") as read_f:
-        conftest_content = read_f.read()
-        updated_conftest_content = conftest_content.replace(
-            "Path(inspect.getfile(playwright)).parent",
-            "Path(inspect.getfile(patchright)).parent"
-        )
-
-        with open("./tests/conftest.py", "w") as write_f:
-            write_f.write(updated_conftest_content)
-
-
     for root, _, files in os.walk("tests"):
         for file in files:
             file_path = os.path.join(root, file)

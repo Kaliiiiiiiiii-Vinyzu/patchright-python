@@ -158,19 +158,16 @@ with open("playwright-python/playwright/_impl/_browser_type.py") as f:
                 ),
             ))
             node.args.kw_defaults.append(ast.Constant(value=None))
+
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "connect":
+            for subnode in ast.walk(node):
+                if isinstance(subnode, ast.Call) and isinstance(subnode.func, ast.Attribute) and subnode.func.attr == "send_return_as_dict":
+                    if len(subnode.args) >= 3 and isinstance(subnode.args[2], ast.Dict):
+                        for key in subnode.args[2].keys:
+                            if isinstance(key, ast.Constant) and key.value == "wsEndpoint":
+                                key.value = "endpoint"
+
     patch_file("playwright-python/playwright/_impl/_browser_type.py", browser_type_tree)
-
-# Patching playwright/_impl/_driver.py
-with open("playwright-python/playwright/_impl/_driver.py") as f:
-    driver_source = f.read()
-    driver_tree = ast.parse(driver_source)
-
-    for node in ast.walk(driver_tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and len(node.args) >= 1 and isinstance(node.args[0], ast.Name):
-            if node.func.value.id == "inspect" and node.func.attr == "getfile" and node.args[0].id == "playwright":
-                node.args[0].id = "patchright"
-
-    patch_file("playwright-python/playwright/_impl/_driver.py", driver_tree)
 
 # Patching playwright/_impl/_connection.py
 with open("playwright-python/playwright/_impl/_connection.py") as f:
@@ -230,6 +227,21 @@ with open("playwright-python/playwright/_impl/_frame.py") as f:
     frame_tree = ast.parse(frame_source)
 
     for node in ast.walk(frame_tree):
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "wait_for_url":
+            node.body = ast.parse("""\
+assert self._page
+if url_matches(self._page._browser_context._base_url, self.url, url):
+    await self._wait_for_load_state_impl(state=waitUntil, timeout=timeout)
+    return
+try:
+    async with self.expect_navigation(url=url, waitUntil=waitUntil, timeout=timeout):
+        pass
+except Exception:
+    if url_matches(self._page._browser_context._base_url, self.url, url):
+        await self._wait_for_load_state_impl(state=waitUntil, timeout=timeout)
+        return
+    raise""").body
+
         if isinstance(node, ast.AsyncFunctionDef) and node.name in ["evaluate", "evaluate_handle", "eval_on_selector_all"]:
             node.args.kwonlyargs.append(ast.arg(
                 arg="isolatedContext",
@@ -295,6 +307,117 @@ with open("playwright-python/playwright/_impl/_locator.py") as f:
 
     patch_file("playwright-python/playwright/_impl/_locator.py", frame_tree)
 
+# Patching playwright/_impl/_network.py
+with open("playwright-python/playwright/_impl/_network.py") as f:
+    network_source = f.read()
+    network_tree = ast.parse(network_source)
+
+    for node in ast.walk(network_tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "playwright._impl._errors":
+            if not any(alias.name == "TargetClosedError" for alias in node.names):
+                node.names.append(ast.alias(name="TargetClosedError", asname=None))
+
+        if isinstance(node, ast.ClassDef) and node.name == "FallbackOverrideParameters":
+            if not any(
+                isinstance(class_node, ast.AnnAssign)
+                and isinstance(class_node.target, ast.Name)
+                and class_node.target.id == "patchrightInitScript"
+                for class_node in node.body
+            ):
+                node.body.append(
+                    ast.AnnAssign(
+                        target=ast.Name(id="patchrightInitScript", ctx=ast.Store()),
+                        annotation=ast.Subscript(
+                            value=ast.Name(id="Optional", ctx=ast.Load()),
+                            slice=ast.Name(id="bool", ctx=ast.Load()),
+                            ctx=ast.Load(),
+                        ),
+                        value=None,
+                        simple=1,
+                    )
+                )
+
+        if isinstance(node, ast.ClassDef) and node.name == "SerializedFallbackOverrides":
+            for class_node in node.body:
+                if isinstance(class_node, ast.FunctionDef) and class_node.name == "__init__":
+                    if not any(
+                        isinstance(init_node, ast.Assign)
+                        and isinstance(init_node.targets[0], ast.Attribute)
+                        and init_node.targets[0].attr == "patchright_init_script"
+                        for init_node in class_node.body
+                    ):
+                        class_node.body.append(
+                            ast.parse("self.patchright_init_script: bool = False").body[0]
+                        )
+
+        if isinstance(node, ast.ClassDef) and node.name == "Request":
+            for class_node in node.body:
+                if isinstance(class_node, ast.FunctionDef) and class_node.name == "_apply_fallback_overrides":
+                    class_node.body = ast.parse("""\
+if overrides.get("url"):
+    self._fallback_overrides.url = overrides["url"]
+if overrides.get("method"):
+    self._fallback_overrides.method = overrides["method"]
+if overrides.get("headers"):
+    self._fallback_overrides.headers = overrides["headers"]
+if overrides.get("patchrightInitScript"):
+    self._fallback_overrides.patchright_init_script = True
+post_data = overrides.get("postData")
+if isinstance(post_data, str):
+    self._fallback_overrides.post_data_buffer = post_data.encode()
+elif isinstance(post_data, bytes):
+    self._fallback_overrides.post_data_buffer = post_data
+elif post_data is not None:
+    self._fallback_overrides.post_data_buffer = json.dumps(post_data).encode()""").body
+
+                elif isinstance(class_node, ast.AsyncFunctionDef) and class_node.name == "all_headers":
+                    class_node.body = ast.parse("""\
+headers = await self._actual_headers()
+page = self._safe_page()
+if page and page._close_was_called:
+    raise TargetClosedError()
+return headers.headers()""").body
+
+        if isinstance(node, ast.ClassDef) and node.name == "Route":
+            for class_node in node.body:
+                if isinstance(class_node, ast.AsyncFunctionDef) and class_node.name in ["fallback", "continue_"]:
+                    if not any(arg.arg == "patchrightInitScript" for arg in class_node.args.args):
+                        class_node.args.args.append(
+                            ast.arg(
+                                arg="patchrightInitScript",
+                                annotation=ast.Subscript(
+                                    value=ast.Name(id="Optional", ctx=ast.Load()),
+                                    slice=ast.Name(id="bool", ctx=ast.Load()),
+                                    ctx=ast.Load(),
+                                ),
+                            )
+                        )
+                        class_node.args.defaults.append(ast.Constant(value=None))
+
+                elif isinstance(class_node, ast.AsyncFunctionDef) and class_node.name == "_inner_continue":
+                    class_node.body = ast.parse("""\
+options = self.request._fallback_overrides
+await self._race_with_page_close(
+    self._channel.send(
+        "continue",
+        None,
+        {
+            "url": options.url,
+            "method": options.method,
+            "headers": serialize_headers(options.headers) if options.headers else None,
+            "postData": (
+                base64.b64encode(options.post_data_buffer).decode()
+                if options.post_data_buffer is not None
+                else None
+            ),
+            "isFallback": is_fallback,
+            "patchrightInitScript": True if options.patchright_init_script else None,
+        },
+    )
+)""").body
+
+    patch_file("playwright-python/playwright/_impl/_network.py", network_tree)
+
 # Patching playwright/_impl/_browser_context.py
 with open("playwright-python/playwright/_impl/_browser_context.py") as f:
     browser_context_source = f.read()
@@ -307,6 +430,22 @@ with open("playwright-python/playwright/_impl/_browser_context.py") as f:
                     class_node.body.insert(0, ast.parse("await self.install_inject_route()"))
                 elif isinstance(class_node, ast.AsyncFunctionDef) and class_node.name == "expose_binding":
                     class_node.body.insert(0, ast.parse("await self.install_inject_route()"))
+                elif isinstance(class_node, ast.FunctionDef) and class_node.name == "_on_dialog":
+                    class_node.body = ast.parse("""\
+has_listeners = self.emit(BrowserContext.Events.Dialog, dialog)
+page = dialog.page
+if page:
+    has_listeners = page.emit(Page.Events.Dialog, dialog) or has_listeners
+if not has_listeners:
+    async def handle_dialog() -> None:
+        try:
+            if dialog.type == "beforeunload":
+                await self._connection.wrap_api_call(lambda: dialog.accept(), is_internal=True)
+            else:
+                await self._connection.wrap_api_call(lambda: dialog.dismiss(), is_internal=True)
+        except Exception:
+            pass
+    asyncio.create_task(handle_dialog())""").body
 
             node.body.append(
                 ast.Assign(
@@ -323,8 +462,7 @@ async def install_inject_route(self) -> None:
     async def route_handler(route: Route) -> None:
             try:
                 if route.request.resource_type == "document" and route.request.url.startswith("http"):
-                    protocol = route.request.url.split(":")[0]
-                    await route.fallback(url=f"{protocol}://patchright-init-script-inject.internal/")
+                    await route.fallback(patchrightInitScript=True)
                 else:
                     await route.fallback()
             except:
@@ -361,6 +499,11 @@ with open("playwright-python/playwright/_impl/_page.py") as f:
                     class_node.body.insert(0, ast.parse("await self.install_inject_route()"))
                 elif isinstance(class_node, ast.AsyncFunctionDef) and class_node.name == "expose_binding":
                     class_node.body.insert(0, ast.parse("await self.install_inject_route()"))
+                elif isinstance(class_node, ast.FunctionDef) and class_node.name == "video":
+                    class_node.body = ast.parse("""\
+if self._browser_context._options.get("recordVideo") is None:
+    return None
+return self._force_video()""").body
 
             node.body.append(
                 ast.Assign(
@@ -377,8 +520,7 @@ async def install_inject_route(self) -> None:
     async def route_handler(route: Route) -> None:
             try:
                 if route.request.resource_type == "document" and route.request.url.startswith("http"):
-                    protocol = route.request.url.split(":")[0]
-                    await route.fallback(url=f"{protocol}://patchright-init-script-inject.internal/")
+                    await route.fallback(patchrightInitScript=True)
                 else:
                     await route.fallback()
             except:
@@ -455,7 +597,7 @@ with open("playwright-python/playwright/_impl/_tracing.py") as f:
 
     for node in ast.walk(tracing_tree):
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "start":
-            node.body.insert(0, ast.parse("await self._parent.install_inject_route()"))
+            node.body.insert(0, ast.parse("if hasattr(self._parent, 'install_inject_route'):\n    await self._parent.install_inject_route()").body[0])
 
     patch_file("playwright-python/playwright/_impl/_tracing.py", tracing_tree)
 
@@ -503,6 +645,30 @@ with open("playwright-python/playwright/async_api/_generated.py") as f:
                             subnode.keywords.append(
                                 ast.keyword(arg="focusControl", value=ast.Name(id="focus_control", ctx=ast.Load()))
                             )
+
+        if isinstance(class_node, ast.ClassDef) and class_node.name == "Route":
+            for node in class_node.body:
+                if isinstance(node, ast.AsyncFunctionDef) and node.name in ["fallback", "continue_"]:
+                    if not any(arg.arg == "patchrightInitScript" for arg in node.args.kwonlyargs):
+                        node.args.kwonlyargs.append(ast.arg(
+                            arg="patchrightInitScript",
+                            annotation=ast.Subscript(
+                                value=ast.Name(id="typing.Optional", ctx=ast.Load()),
+                                slice=ast.Name(id="bool", ctx=ast.Load()),
+                                ctx=ast.Load(),
+                            ),
+                        ))
+                        node.args.kw_defaults.append(ast.Constant(value=None))
+
+                    for subnode in ast.walk(node):
+                        if isinstance(subnode, ast.Call) and isinstance(subnode.func, ast.Attribute) and subnode.func.attr == node.name:
+                            if not any(keyword.arg == "patchrightInitScript" for keyword in subnode.keywords):
+                                subnode.keywords.append(
+                                    ast.keyword(
+                                        arg="patchrightInitScript",
+                                        value=ast.Name(id="patchrightInitScript", ctx=ast.Load()),
+                                    )
+                                )
 
     patch_file("playwright-python/playwright/async_api/_generated.py", async_generated_tree)
 
@@ -554,6 +720,30 @@ with open("playwright-python/playwright/sync_api/_generated.py") as f:
                                     ast.keyword(arg="focusControl", value=ast.Name(id="focus_control", ctx=ast.Load()))
                                 )
 
+        if isinstance(class_node, ast.ClassDef) and class_node.name == "Route":
+            for node in class_node.body:
+                if isinstance(node, ast.FunctionDef) and node.name in ["fallback", "continue_"]:
+                    if not any(arg.arg == "patchrightInitScript" for arg in node.args.kwonlyargs):
+                        node.args.kwonlyargs.append(ast.arg(
+                            arg="patchrightInitScript",
+                            annotation=ast.Subscript(
+                                value=ast.Name(id="typing.Optional", ctx=ast.Load()),
+                                slice=ast.Name(id="bool", ctx=ast.Load()),
+                                ctx=ast.Load(),
+                            ),
+                        ))
+                        node.args.kw_defaults.append(ast.Constant(value=None))
+
+                    for subnode in ast.walk(node):
+                        if isinstance(subnode, ast.Call) and isinstance(subnode.func, ast.Attribute) and subnode.func.attr == node.name:
+                            if not any(keyword.arg == "patchrightInitScript" for keyword in subnode.keywords):
+                                subnode.keywords.append(
+                                    ast.keyword(
+                                        arg="patchrightInitScript",
+                                        value=ast.Name(id="patchrightInitScript", ctx=ast.Load()),
+                                    )
+                                )
+
     patch_file("playwright-python/playwright/sync_api/_generated.py", async_generated_tree)
 
 # Patching Imports of every python file under the playwright-python/playwright directory
@@ -576,6 +766,8 @@ for python_file in glob.glob("playwright-python/playwright/**.py") + glob.glob("
                 unparsed_attribute = ast.unparse(node.value)
                 if unparsed_attribute in renamed_attributes:
                     node.value = ast.parse(unparsed_attribute.replace("playwright", "patchright", 1)).body[0].value
+            if isinstance(node, ast.Name) and node.id == "playwright" and "_driver.py" in python_file:
+                node.id = "patchright"
 
         patch_file(python_file, file_tree)
 
