@@ -503,7 +503,7 @@ with open("playwright-python/playwright/_impl/_page.py") as f:
                     class_node.body = ast.parse("""\
 if self._browser_context._options.get("recordVideo") is None:
     return None
-return self._force_video()""").body
+return self._video""").body
 
             node.body.append(
                 ast.Assign(
