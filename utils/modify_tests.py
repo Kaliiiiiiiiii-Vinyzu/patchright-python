@@ -134,6 +134,13 @@ def process_file(file_path):
             ):
                 node.keywords.append(ast.keyword(arg='isolated_context', value=ast.Constant(value=False)))
 
+            # Add no_wait_after=True to add_locator_handler in owner_frame_detaches test
+            if (test_name == "test_should_work_when_owner_frame_detaches"
+                and node.func.attr == "add_locator_handler"
+                and isinstance(node.func.value, ast.Name)
+            ):
+                node.keywords.append(ast.keyword(arg='no_wait_after', value=ast.Constant(value=True)))
+
     modified_source = ast.unparse(ast.fix_missing_locations(file_tree))
 
     with open(file_path, 'w', encoding='utf-8') as f:
