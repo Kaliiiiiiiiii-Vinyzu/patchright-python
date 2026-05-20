@@ -211,7 +211,7 @@ with open("playwright-python/playwright/_impl/_js_handle.py") as f:
                 if isinstance(subnode, ast.Return) and isinstance(subnode.value, ast.Call):
                     if subnode.value.args and isinstance(subnode.value.args[0], ast.Await):
                         inner_call = subnode.value.args[0].value
-                        if isinstance(inner_call, ast.Call) and inner_call.func.attr == "send":
+                        if isinstance(inner_call, ast.Call) and isinstance(inner_call.func, ast.Attribute) and inner_call.func.attr == "send":
                             for i, arg in enumerate(inner_call.args):
                                 if isinstance(arg, ast.Call) and arg.func.id == "dict":
                                     arg.keywords.append(ast.keyword(
@@ -257,7 +257,7 @@ except Exception:
                 if isinstance(subnode, ast.Return) and isinstance(subnode.value, ast.Call):
                     if subnode.value.args and isinstance(subnode.value.args[0], ast.Await):
                         inner_call = subnode.value.args[0].value
-                        if isinstance(inner_call, ast.Call) and inner_call.func.attr == "send":
+                        if isinstance(inner_call, ast.Call) and isinstance(inner_call.func, ast.Attribute) and inner_call.func.attr == "send":
                             for i, arg in enumerate(inner_call.args):
                                 if isinstance(arg, ast.Call) and arg.func.id == "dict":
                                     arg.keywords.append(ast.keyword(
@@ -559,7 +559,7 @@ async def install_inject_route(self) -> None:
                     if isinstance(subnode, ast.Return) and isinstance(subnode.value, ast.Call):
                         if subnode.value.args and isinstance(subnode.value.args[0], ast.Await):
                             inner_call = subnode.value.args[0].value
-                            if isinstance(inner_call, ast.Call) and inner_call.func.attr == "send":
+                            if isinstance(inner_call, ast.Call) and isinstance(inner_call.func, ast.Attribute) and inner_call.func.attr == "send":
                                 for i, arg in enumerate(inner_call.args):
                                     if isinstance(arg, ast.Call) and arg.func.id == "dict":
                                         arg.keywords.append(ast.keyword(
@@ -621,7 +621,7 @@ with open("playwright-python/playwright/async_api/_generated.py") as f:
 
                     # Modify the inner function call inside return statement
                     for subnode in ast.walk(node):
-                        if isinstance(subnode, ast.Call) and subnode.func.attr == node.name:
+                        if isinstance(subnode, ast.Call) and isinstance(subnode.func, ast.Attribute) and subnode.func.attr == node.name:
                             subnode.keywords.append(
                                 ast.keyword(arg="isolatedContext",
                                             value=ast.Name(id="isolated_context",
@@ -641,7 +641,7 @@ with open("playwright-python/playwright/async_api/_generated.py") as f:
                     node.args.kw_defaults.append(ast.Constant(value=None))
 
                     for subnode in ast.walk(node):
-                        if isinstance(subnode, ast.Call) and subnode.func.attr == node.name:
+                        if isinstance(subnode, ast.Call) and isinstance(subnode.func, ast.Attribute) and subnode.func.attr == node.name:
                             subnode.keywords.append(
                                 ast.keyword(arg="focusControl", value=ast.Name(id="focus_control", ctx=ast.Load()))
                             )
@@ -692,7 +692,7 @@ with open("playwright-python/playwright/sync_api/_generated.py") as f:
 
                     # Modify the inner function call inside return statement
                     for subnode in ast.walk(node):
-                        if isinstance(subnode, ast.Call) and subnode.func.attr == node.name:
+                        if isinstance(subnode, ast.Call) and isinstance(subnode.func, ast.Attribute) and subnode.func.attr == node.name:
                             subnode.keywords.append(
                                 ast.keyword(arg="isolatedContext",
                                             value=ast.Name(id="isolated_context",
@@ -715,7 +715,7 @@ with open("playwright-python/playwright/sync_api/_generated.py") as f:
 
                     if class_node.name != "BrowserContext" and node.name != "new_page":
                         for subnode in ast.walk(node):
-                            if isinstance(subnode, ast.Call) and subnode.func.attr == node.name:
+                            if isinstance(subnode, ast.Call) and isinstance(subnode.func, ast.Attribute) and subnode.func.attr == node.name:
                                 subnode.keywords.append(
                                     ast.keyword(arg="focusControl", value=ast.Name(id="focus_control", ctx=ast.Load()))
                                 )
