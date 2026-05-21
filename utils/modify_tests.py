@@ -63,6 +63,9 @@ tests_to_skip = [
     "test_should_report_request_headers_array",
     "test_request_headers_should_get_the_same_headers_as_the_server_cors",
     "test_request_headers_should_get_the_same_headers_as_the_server",
+
+    # Patchright dispatchEvent cross-context adoption can hang for drag payload handles.
+    "test_should_dispatch_drag_drop_events"
 ]
 
 dont_isolate_evaluation_tests = [
@@ -166,6 +169,19 @@ def main():
                 ).replace(
                     '"data:text/html,<html></html>"',
                     'server.PREFIX + "/empty.html"'
+                )
+
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+
+            # https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/issues/30
+            if file == "test_asyncio.py":
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+
+                content = content.replace(
+                    "from playwright.async_api import async_playwright",
+                    "from patchright.async_api import async_playwright"
                 )
 
                 with open(file_path, 'w', encoding='utf-8') as f:
