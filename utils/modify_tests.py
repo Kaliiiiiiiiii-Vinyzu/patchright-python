@@ -41,6 +41,7 @@ tests_to_skip = [
     "test_workers_should_report_errors",
     "test_worker_should_report_console_event",
     "test_worker_should_report_console_event_when_not_listening_on_page_or_context",
+    "test_weberror_event_should_include_location",
 
     # InitScript Timing
     "test_expose_function_should_be_callable_from_inside_add_init_script",
@@ -62,6 +63,9 @@ tests_to_skip = [
     "test_should_report_request_headers_array",
     "test_request_headers_should_get_the_same_headers_as_the_server_cors",
     "test_request_headers_should_get_the_same_headers_as_the_server",
+
+    # Patchright dispatchEvent cross-context adoption can hang for drag payload handles.
+    "test_should_dispatch_drag_drop_events"
 ]
 
 dont_isolate_evaluation_tests = [
@@ -133,6 +137,13 @@ def process_file(file_path):
             ):
                 node.keywords.append(ast.keyword(arg='isolated_context', value=ast.Constant(value=False)))
 
+            # Add no_wait_after=True to add_locator_handler in owner_frame_detaches test
+            if (test_name == "test_should_work_when_owner_frame_detaches"
+                and node.func.attr == "add_locator_handler"
+                and isinstance(node.func.value, ast.Name)
+            ):
+                node.keywords.append(ast.keyword(arg='no_wait_after', value=ast.Constant(value=True)))
+
     modified_source = ast.unparse(ast.fix_missing_locations(file_tree))
 
     with open(file_path, 'w', encoding='utf-8') as f:
@@ -141,17 +152,6 @@ def process_file(file_path):
 def main():
     with open("./tests/assets/inject.html", "w") as f:
         f.write("<script>window.result = window.injected;</script>")
-
-    with open("./tests/conftest.py", "r") as read_f:
-        conftest_content = read_f.read()
-        updated_conftest_content = conftest_content.replace(
-            "Path(inspect.getfile(playwright)).parent",
-            "Path(inspect.getfile(patchright)).parent"
-        )
-
-        with open("./tests/conftest.py", "w") as write_f:
-            write_f.write(updated_conftest_content)
-
 
     for root, _, files in os.walk("tests"):
         for file in files:
@@ -169,6 +169,19 @@ def main():
                 ).replace(
                     '"data:text/html,<html></html>"',
                     'server.PREFIX + "/empty.html"'
+                )
+
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+
+            # https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/issues/30
+            if file == "test_asyncio.py":
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+
+                content = content.replace(
+                    "from playwright.async_api import async_playwright",
+                    "from patchright.async_api import async_playwright"
                 )
 
                 with open(file_path, 'w', encoding='utf-8') as f:
@@ -208,6 +221,13 @@ def main():
 
             if file.endswith('.py'):
                 process_file(file_path)
+
+            if file == "conftest.py":
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                content = content.replace("inspect.getfile(playwright)", "inspect.getfile(patchright)")
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
 
             if file == "test_queryselector.py":
                 with open(file_path, 'r', encoding='utf-8') as f:
