@@ -1,7 +1,18 @@
 name: Patchright Chromium Tests
 
 on:
+  workflow_call:
+    inputs:
+      playwright_version:
+        description: 'Playwright Version to test against, e.g. v1.58.0 or 1.58.0. If empty, latest release is used.'
+        required: false
+        type: string
   workflow_dispatch:
+    inputs:
+      playwright_version:
+        description: 'Playwright Version to test against, e.g. v1.58.0 or 1.58.0. If empty, latest release is used.'
+        required: false
+        type: string
   push:
     branches: [main]
   pull_request:
@@ -25,7 +36,12 @@ jobs:
       - name: Install Playwright-Python Package
         run: |
           uv sync --all-groups
-          PLAYWRIGHT_TAG=$(curl -fsSL "https://api.github.com/repos/microsoft/playwright-python/releases/latest" | jq -r '.tag_name')
+          PLAYWRIGHT_TAG="${{ inputs.playwright_version || github.event.inputs.playwright_version }}"
+          if [ -z "$PLAYWRIGHT_TAG" ]; then
+            PLAYWRIGHT_TAG=$(curl -fsSL "https://api.github.com/repos/microsoft/playwright-python/releases/latest" | jq -r '.tag_name')
+          else
+            PLAYWRIGHT_TAG="v${PLAYWRIGHT_TAG#v}"
+          fi
           PLAYWRIGHT_MINOR=${PLAYWRIGHT_TAG#v}
           PLAYWRIGHT_MINOR=${PLAYWRIGHT_MINOR%.*}
           PATCHRIGHT_RELEASE=$(curl -fsSL "https://api.github.com/repos/Kaliiiiiiiiii-Vinyzu/patchright/releases?per_page=100" | jq -r --arg minor "$PLAYWRIGHT_MINOR" '[.[].tag_name | ltrimstr("v") | select(startswith($minor + ".")) | select((try (split(".") | map(tonumber) | length) catch 0) == 3)] | sort_by(split(".") | map(tonumber)) | last')

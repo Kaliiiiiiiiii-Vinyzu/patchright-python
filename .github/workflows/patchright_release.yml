@@ -5,10 +5,10 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Playwright Version (Base)'
+        description: 'Playwright Version (e.g. v1.58.0 or 1.58.0)'
         default: ''
       patchright_release:
-        description: 'Patchright Release Version (e.g. `1.55.2`)'
+        description: 'Patchright Release Version (e.g. v1.58.0 or 1.58.0) on pypi'
         default: ''
   # running every hour
   schedule:
@@ -16,10 +16,59 @@ on:
 
 env:
   REPO: ${{ github.repository }}
+  patchright_release: ${{ github.event.inputs.patchright_release || '' }}
 
 jobs:
+  check-release-version:
+    name: Check Release Version
+    runs-on: ubuntu-latest
+    outputs:
+      proceed: ${{ steps.version_check.outputs.proceed }}
+      playwright_version: ${{ steps.version_check.outputs.playwright_version }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Check Release Version
+        id: version_check
+        run: |
+          PLAYWRIGHT_VERSION=""
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            raw_version="${{ github.event.inputs.version }}"
+            PLAYWRIGHT_VERSION="v${raw_version#v}"
+            echo "proceed=true" >>$GITHUB_OUTPUT
+            echo "playwright_version=$PLAYWRIGHT_VERSION" >> $GITHUB_ENV
+            if [ -n "${{ github.event.inputs.patchright_release }}" ]; then
+              raw_patchright_release="${{ github.event.inputs.patchright_release }}"
+              echo "patchright_release=${raw_patchright_release#v}" >> $GITHUB_ENV
+            fi
+          elif [ -n "${{ github.event.inputs.patchright_release }}" ]; then
+            raw_patchright_release="${{ github.event.inputs.patchright_release }}"
+            echo "patchright_release=${raw_patchright_release#v}" >> $GITHUB_ENV
+            response=$(curl --silent "https://api.github.com/repos/microsoft/playwright-python/releases/latest")
+            PLAYWRIGHT_VERSION=$(echo "$response" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+            echo "proceed=true" >>$GITHUB_OUTPUT
+            echo "playwright_version=$PLAYWRIGHT_VERSION" >> $GITHUB_ENV
+          else
+            chmod +x utils/release_version_check.sh
+            utils/release_version_check.sh
+            PLAYWRIGHT_VERSION=$(grep '^playwright_version=' "$GITHUB_ENV" | tail -n1 | cut -d= -f2-)
+          fi
+          if [ -n "$PLAYWRIGHT_VERSION" ]; then
+            echo "playwright_version=$PLAYWRIGHT_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+  run-patchright-tests:
+    name: Run Patchright Tests
+    needs: check-release-version
+    if: needs.check-release-version.outputs.proceed == 'true'
+    uses: ./.github/workflows/patchright_tests.yml
+    with:
+      playwright_version: ${{ needs.check-release-version.outputs.playwright_version }}
+
   patchright-release-workflow:
     name: "Patchright-Python Workflow: Install, Patch, Build and Publish Patchright Python Package"
+    needs: [check-release-version, run-patchright-tests]
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -37,30 +86,13 @@ jobs:
       - name: Set up Python
         run: uv python install
 
-      - name: Check Release Version
-        id: version_check
-        run: |
-          echo "patchright_release=${{ github.event.inputs.patchright_release }}" >> $GITHUB_ENV
-          PLAYWRIGHT_VERSION=""
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            PLAYWRIGHT_VERSION="${{ github.event.inputs.version }}"
-            echo "proceed=true" >>$GITHUB_OUTPUT
-            echo "playwright_version=$PLAYWRIGHT_VERSION" >> $GITHUB_ENV
-          else
-            chmod +x utils/release_version_check.sh
-            utils/release_version_check.sh
-            PLAYWRIGHT_VERSION=$(grep '^playwright_version=' "$GITHUB_ENV" | tail -n1 | cut -d= -f2-)
-          fi
-          if [ -n "$PLAYWRIGHT_VERSION" ]; then
-            echo "playwright_version=$PLAYWRIGHT_VERSION" >> $GITHUB_OUTPUT
-          fi
-
       - name: Install Playwright-Python Package
-        if: steps.version_check.outputs.proceed == 'true'
+        env:
+          playwright_version: ${{ needs.check-release-version.outputs.playwright_version }}
         run: |
           uv sync --all-groups
           if [ -n "$patchright_release" ]; then
-            PATCHRIGHT_RELEASE="$patchright_release"
+            PATCHRIGHT_RELEASE="${patchright_release#v}"
           else
             PLAYWRIGHT_MINOR=${playwright_version#v}
             PLAYWRIGHT_MINOR=${PLAYWRIGHT_MINOR%.*}
@@ -72,13 +104,11 @@ jobs:
           uv add -r playwright-python/local-requirements.txt --dev
 
       - name: Patch Playwright-Python Package
-        if: steps.version_check.outputs.proceed == 'true'
         run: |
           uv run patch_python_package.py
           uvx ruff format playwright-python
 
       - name: Build Patchright-Python Package
-        if: steps.version_check.outputs.proceed == 'true'
         run: |
           cd playwright-python
           uv pip install -e .
@@ -87,13 +117,12 @@ jobs:
           done
 
       - name: Create Empty Versioning Release
-        if: steps.version_check.outputs.proceed == 'true'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.version_check.outputs.playwright_version }}
-          release_name: ${{ steps.version_check.outputs.playwright_version }}
+          tag_name: ${{ needs.check-release-version.outputs.playwright_version }}
+          release_name: ${{ needs.check-release-version.outputs.playwright_version }}
           body: |
             This is an automatic deployment in response to a new release of [microsoft/playwright-python](https://github.com/microsoft/playwright-python).
             This Release is only used for Versioning.
@@ -101,7 +130,6 @@ jobs:
           prerelease: false
 
       - name: Publish Patchright-Python Package
-        if: steps.version_check.outputs.proceed == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: playwright-python/dist/
