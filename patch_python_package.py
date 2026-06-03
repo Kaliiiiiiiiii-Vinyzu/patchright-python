@@ -47,7 +47,7 @@ with open("playwright-python/setup.py") as f:
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.targets[0], ast.Name):
             if node.targets[0].id == "driver_version" and node.value.value.startswith("1."):
                 # node.value.value = node.value.value.split("-")[0]
-                node.value.value = patchright_version
+                node.value.value = os.environ.get('patchright_driver_version') or patchright_version
 
         # Modify url
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.targets[0], ast.Name):

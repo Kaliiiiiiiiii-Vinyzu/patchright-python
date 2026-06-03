@@ -47,6 +47,7 @@ jobs:
           PATCHRIGHT_RELEASE=$(curl -fsSL "https://api.github.com/repos/Kaliiiiiiiiii-Vinyzu/patchright/releases?per_page=100" | jq -r --arg minor "$PLAYWRIGHT_MINOR" '[.[].tag_name | ltrimstr("v") | select(startswith($minor + ".")) | select((try (split(".") | map(tonumber) | length) catch 0) == 3)] | sort_by(split(".") | map(tonumber)) | last')
           test -n "$PATCHRIGHT_RELEASE" -a "$PATCHRIGHT_RELEASE" != "null"
           echo "patchright_release=$PATCHRIGHT_RELEASE" >> $GITHUB_ENV
+          echo "patchright_driver_version=$PATCHRIGHT_RELEASE" >> $GITHUB_ENV
           git clone https://github.com/microsoft/playwright-python --branch "$PLAYWRIGHT_TAG"
           cd playwright-python
           uv add -r local-requirements.txt
