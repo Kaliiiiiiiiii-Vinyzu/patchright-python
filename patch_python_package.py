@@ -5,14 +5,38 @@ import os
 import toml
 
 patchright_version = os.environ.get('patchright_release') or os.environ.get('playwright_version')
+patchright_driver_version = os.environ.get('patchright_driver_version') or patchright_version
 
 def patch_file(file_path: str, patched_tree: ast.AST) -> None:
     with open(file_path, "w") as f:
         f.write(ast.unparse(ast.fix_missing_locations(patched_tree)))
 
+def patch_driver_version_file() -> None:
+    driver_version_file = "playwright-python/DRIVER_VERSION"
+    if os.path.exists(driver_version_file):
+        with open(driver_version_file, "w") as f:
+            f.write(f"{patchright_driver_version}\n")
+
+def patch_ensure_driver_bundle(node: ast.FunctionDef) -> None:
+    if node.name != "ensure_driver_bundle":
+        return
+
+    node.body = ast.parse("""\
+destination_path = f"driver/playwright-{driver_version}-{zip_name}.zip"
+if os.path.exists(destination_path):
+    return
+os.makedirs("driver", exist_ok=True)
+url = f"https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/releases/download/v{driver_version}/playwright-{driver_version}-{zip_name}.zip"
+subprocess.check_call(["curl", "-L", "--fail", "-o", destination_path, url])
+if not os.path.exists(destination_path):
+    raise RuntimeError(f"Driver bundle {destination_path} was not downloaded.")
+""").body
+
 # Adding _repo_version.py (Might not be intended but fixes the build)
 with open("playwright-python/playwright/_repo_version.py", "w") as f:
     f.write(f"version = '{patchright_version}'")
+
+patch_driver_version_file()
 
 # Patching pyproject.toml
 with open("playwright-python/pyproject.toml", "r") as f:
@@ -47,7 +71,10 @@ with open("playwright-python/setup.py") as f:
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.targets[0], ast.Name):
             if node.targets[0].id == "driver_version" and node.value.value.startswith("1."):
                 # node.value.value = node.value.value.split("-")[0]
-                node.value.value = os.environ.get('patchright_driver_version') or patchright_version
+                node.value.value = patchright_driver_version
+
+        if isinstance(node, ast.FunctionDef):
+            patch_ensure_driver_bundle(node)
 
         # Modify url
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.targets[0], ast.Name):
