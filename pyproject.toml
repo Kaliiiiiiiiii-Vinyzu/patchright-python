@@ -1,11 +1,20 @@
-# Only for test Runs, does not relate to actual Patchright package
+[build-system]
+requires = ["setuptools>=61.0", "setuptools-scm>=9"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "patchright-tests"
-version = "1.0.0"
+name = "patchright"
+dynamic = ["version"]
+description = "Undetected Python version of the Playwright testing and automation library."
 requires-python = ">=3.11"
-dependencies = [
-    "patchright>=1.59.1",
-]
+
+[tool.setuptools]
+packages = []
+
+[tool.setuptools_scm]
+
+[tool.uv]
+package = false
 
 [tool.pytest.ini_options]
 addopts = "-Wall -rsx" #  -s
