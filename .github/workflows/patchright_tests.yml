@@ -38,7 +38,7 @@ jobs:
           uv sync --all-groups
           PLAYWRIGHT_TAG="${{ inputs.playwright_version || github.event.inputs.playwright_version }}"
           if [ -z "$PLAYWRIGHT_TAG" ]; then
-            PLAYWRIGHT_TAG=$(curl -fsSL "https://api.github.com/repos/microsoft/playwright-python/releases/latest" | jq -r '.tag_name')
+            PLAYWRIGHT_TAG=$(curl -fsSL "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest" | jq -r '.tag_name')
           else
             PLAYWRIGHT_TAG="v${PLAYWRIGHT_TAG#v}"
           fi
