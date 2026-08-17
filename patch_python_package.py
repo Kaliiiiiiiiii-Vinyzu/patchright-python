@@ -5,7 +5,6 @@ import os
 import toml
 
 patchright_version = os.environ.get('patchright_release') or os.environ.get('playwright_version')
-patchright_driver_version = os.environ.get('patchright_driver_version') or patchright_version
 
 def patch_file(file_path: str, patched_tree: ast.AST) -> None:
     with open(file_path, "w") as f:
@@ -15,28 +14,62 @@ def patch_driver_version_file() -> None:
     driver_version_file = "playwright-python/DRIVER_VERSION"
     if os.path.exists(driver_version_file):
         with open(driver_version_file, "w") as f:
-            f.write(f"{patchright_driver_version}\n")
+            f.write(f"{patchright_version}\n")
 
-def patch_ensure_driver_bundle(node: ast.FunctionDef) -> None:
-    if node.name != "ensure_driver_bundle":
-        return
+def patch_build_driver() -> None:
+    build_driver_file = "playwright-python/scripts/build_driver.py"
+    with open(build_driver_file) as f:
+        source = f.read()
 
-    node.body = ast.parse("""\
-destination_path = f"driver/playwright-{driver_version}-{zip_name}.zip"
-if os.path.exists(destination_path):
-    return
-os.makedirs("driver", exist_ok=True)
-url = f"https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/releases/download/v{driver_version}/playwright-{driver_version}-{zip_name}.zip"
-subprocess.check_call(["curl", "-L", "--fail", "-o", destination_path, url])
-if not os.path.exists(destination_path):
-    raise RuntimeError(f"Driver bundle {destination_path} was not downloaded.")
-""").body
+    tree = ast.parse(source)
+    build_function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "fetch_playwright_core"
+    )
+    artifact_assignments = [
+        node
+        for node in build_function.body
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id in {"url", "tgz"}
+    ]
+    if {node.targets[0].id for node in artifact_assignments} != {"url", "tgz"}:
+        raise RuntimeError("Unexpected scripts/build_driver.py structure")
+
+    targets = [
+        tree.body[0],
+        build_function.body[0],
+        *(node.value for node in artifact_assignments),
+    ]
+    for node in targets:
+        original_segment = ast.get_source_segment(source, node)
+        if (
+            original_segment is None
+            or "playwright-core" not in original_segment
+            or (
+                node is tree.body[0]
+                and "playwright/driver/" not in original_segment
+            )
+        ):
+            raise RuntimeError("Unexpected scripts/build_driver.py structure")
+        patched_segment = original_segment.replace("playwright-core", "patchright-core")
+        if node is tree.body[0]:
+            patched_segment = patched_segment.replace(
+                "playwright/driver/", "patchright/driver/"
+            )
+        source = source.replace(original_segment, patched_segment, 1)
+
+    with open(build_driver_file, "w") as f:
+        f.write(source)
 
 # Adding _repo_version.py (Might not be intended but fixes the build)
 with open("playwright-python/playwright/_repo_version.py", "w") as f:
     f.write(f"version = '{patchright_version}'")
 
 patch_driver_version_file()
+patch_build_driver()
 
 # Patching pyproject.toml
 with open("playwright-python/pyproject.toml", "r") as f:
@@ -67,35 +100,26 @@ with open("playwright-python/setup.py") as f:
     setup_tree = ast.parse(setup_source)
 
     for node in ast.walk(setup_tree):
-        # Modify driver_version
-        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.targets[0], ast.Name):
-            if node.targets[0].id == "driver_version" and node.value.value.startswith("1."):
-                # node.value.value = node.value.value.split("-")[0]
-                node.value.value = patchright_driver_version
-
-        if isinstance(node, ast.FunctionDef):
-            patch_ensure_driver_bundle(node)
-
-        # Modify url
-        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.targets[0], ast.Name):
-            if node.targets[0].id == "url" and node.value.value == "https://cdn.playwright.dev/builds/driver/":
-                node.value = ast.JoinedStr(
-                    values=[
-                        ast.Constant(value='https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/releases/download/v'),
-                        ast.FormattedValue(value=ast.Name(id='driver_version', ctx=ast.Load()), conversion=-1),
-                        ast.Constant(value='/')
-                    ]
-                )
-
-        # Modify Curl Call
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and len(node.args) >= 1 and isinstance(node.args[0], ast.List) and len(node.args[0].elts) == 4:
-            if node.func.value.id == "subprocess" and node.func.attr == "check_call" and node.args[0].elts[0].value == "curl":
-                node.args[0].elts.insert(1, ast.Constant(value="-L"))
-
         # Modify Shutil Call
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and len(node.args) >= 1 and isinstance(node.args[0], ast.Constant):
             if node.func.value.id == "shutil" and node.func.attr == "rmtree" and node.args[0].value == "playwright.egg-info":
                 node.args[0].value = "patchright.egg-info"
+            elif (
+                node.func.value.id == "shutil"
+                and node.func.attr == "rmtree"
+                and node.args[0].value == "playwright/driver"
+            ):
+                node.args[0].value = "patchright/driver"
+
+        # Modify Os Exists Call
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Attribute) and isinstance(node.func.value.value, ast.Name) and len(node.args) >= 1 and isinstance(node.args[0], ast.Constant):
+            if (
+                node.func.value.value.id == "os"
+                and node.func.value.attr == "path"
+                and node.func.attr == "exists"
+                and node.args[0].value == "playwright/driver"
+            ):
+                node.args[0].value = "patchright/driver"
 
         # Modify Os Makedirs Call
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and len(node.args) >= 1 and isinstance(node.args[0], ast.Constant):

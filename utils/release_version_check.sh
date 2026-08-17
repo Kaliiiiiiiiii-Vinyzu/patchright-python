@@ -48,9 +48,9 @@ echo "Latest release of the Patchright-Python: $patchright_version"
 if version_is_behind "$patchright_version" "$playwright_version"; then
   playwright_minor=${playwright_version#v}
   playwright_minor=${playwright_minor%.*}
-  driver_releases=$(curl -fsSL "https://api.github.com/repos/Kaliiiiiiiiii-Vinyzu/patchright/releases?per_page=100") || exit 1
-  if ! jq -e --arg minor "$playwright_minor" 'any(.[].tag_name | ltrimstr("v"); startswith($minor + ".") and (try (split(".") | map(tonumber) | length == 3) catch false))' <<< "$driver_releases" >/dev/null; then
-    echo "Patchright driver release for Playwright $playwright_version is not available yet. Skipping release."
+  patchright_core_versions=$(npm view patchright-core versions --json) || exit 1
+  if ! jq -e --arg minor "$playwright_minor" 'any(.[]; startswith($minor + ".") and (try (split(".") | map(tonumber) | length == 3) catch false))' <<< "$patchright_core_versions" >/dev/null; then
+    echo "patchright-core for Playwright $playwright_version is not available on npm yet. Skipping release."
     echo "proceed=false" >>$GITHUB_OUTPUT
     exit 0
   fi

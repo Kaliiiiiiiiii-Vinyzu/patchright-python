@@ -91,16 +91,24 @@ jobs:
           playwright_version: ${{ needs.check-release-version.outputs.playwright_version }}
         run: |
           uv sync --all-groups
-          PLAYWRIGHT_MINOR=${playwright_version#v}
-          PLAYWRIGHT_MINOR=${PLAYWRIGHT_MINOR%.*}
-          PATCHRIGHT_DRIVER_VERSION=$(curl -fsSL "https://api.github.com/repos/Kaliiiiiiiiii-Vinyzu/patchright/releases?per_page=100" | jq -r --arg minor "$PLAYWRIGHT_MINOR" '[.[].tag_name | ltrimstr("v") | select(startswith($minor + ".")) | select((try (split(".") | map(tonumber) | length) catch 0) == 3)] | sort_by(split(".") | map(tonumber)) | last')
-          test -n "$PATCHRIGHT_DRIVER_VERSION" -a "$PATCHRIGHT_DRIVER_VERSION" != "null"
-          echo "patchright_driver_version=$PATCHRIGHT_DRIVER_VERSION" >> $GITHUB_ENV
-
           if [ -n "$patchright_release" ]; then
             PATCHRIGHT_RELEASE="${patchright_release#v}"
           else
-            PATCHRIGHT_RELEASE="$PATCHRIGHT_DRIVER_VERSION"
+            PLAYWRIGHT_MINOR=${playwright_version#v}
+            PLAYWRIGHT_MINOR=${PLAYWRIGHT_MINOR%.*}
+            PATCHRIGHT_RELEASE=$(npm view patchright-core versions --json | jq -r --arg minor "$PLAYWRIGHT_MINOR" '[.[] | select(startswith($minor + ".")) | select((try (split(".") | map(tonumber) | length) catch 0) == 3)] | sort_by(split(".") | map(tonumber)) | last')
+          fi
+          if [ -z "$PATCHRIGHT_RELEASE" ] || [ "$PATCHRIGHT_RELEASE" = "null" ]; then
+            echo "::error::No published patchright-core version matches Playwright $playwright_version"
+            exit 1
+          fi
+          if ! PUBLISHED_VERSION=$(npm view "patchright-core@$PATCHRIGHT_RELEASE" version); then
+            echo "::error::patchright-core@$PATCHRIGHT_RELEASE is not available from npm"
+            exit 1
+          fi
+          if [ "$PUBLISHED_VERSION" != "$PATCHRIGHT_RELEASE" ]; then
+            echo "::error::Expected patchright-core@$PATCHRIGHT_RELEASE, npm returned $PUBLISHED_VERSION"
+            exit 1
           fi
           echo "patchright_release=$PATCHRIGHT_RELEASE" >> $GITHUB_ENV
           git clone https://github.com/microsoft/playwright-python --branch "$playwright_version"
