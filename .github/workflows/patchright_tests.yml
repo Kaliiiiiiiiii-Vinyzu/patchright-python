@@ -4,13 +4,21 @@ on:
   workflow_call:
     inputs:
       playwright_version:
-        description: 'Playwright Version to test against, e.g. v1.58.0 or 1.58.0. If empty, latest release is used.'
-        required: false
+        description: 'Playwright Version (e.g. v1.58.0 or 1.58.0)'
+        required: true
+        type: string
+      patchright_core_version:
+        description: 'Patchright Core Version (e.g. v1.58.2 or 1.58.2) on npm'
+        required: true
+        type: string
+      patchright_version:
+        description: 'Patchright Release Version (e.g. v1.58.3 or 1.58.3) on PyPI'
+        required: true
         type: string
   workflow_dispatch:
     inputs:
       playwright_version:
-        description: 'Playwright Version to test against, e.g. v1.58.0 or 1.58.0. If empty, latest release is used.'
+        description: 'Playwright Version to test against (e.g. v1.58.0 or 1.58.0). If empty, latest PyPI release is used.'
         required: false
         type: string
   push:
@@ -34,23 +42,52 @@ jobs:
           uv python install
 
       - name: Install Playwright-Python Package
+        env:
+          playwright_version: ${{ inputs.playwright_version }}
+          patchright_core_version: ${{ inputs.patchright_core_version }}
+          patchright_version: ${{ inputs.patchright_version }}
         run: |
           uv sync --all-groups
-          PLAYWRIGHT_TAG="${{ inputs.playwright_version || github.event.inputs.playwright_version }}"
-          if [ -z "$PLAYWRIGHT_TAG" ]; then
-            PLAYWRIGHT_TAG=$(curl -fsSL "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest" | jq -r '.tag_name')
-          else
-            PLAYWRIGHT_TAG="v${PLAYWRIGHT_TAG#v}"
+          if [ -z "$playwright_version" ]; then
+            playwright_version=$(curl -fsSL https://pypi.org/pypi/playwright/json | jq -r '
+              [.releases | to_entries[]
+                | select(.key | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))
+                | select(.value | length > 0)
+                | .key]
+              | sort_by(split(".") | map(tonumber))
+              | last
+            ')
           fi
-          PLAYWRIGHT_MINOR=${PLAYWRIGHT_TAG#v}
-          PLAYWRIGHT_MINOR=${PLAYWRIGHT_MINOR%.*}
-          PATCHRIGHT_RELEASE=$(npm view patchright-core versions --json | jq -r --arg minor "$PLAYWRIGHT_MINOR" '[.[] | select(startswith($minor + ".")) | select((try (split(".") | map(tonumber) | length) catch 0) == 3)] | sort_by(split(".") | map(tonumber)) | last')
-          if [ -z "$PATCHRIGHT_RELEASE" ] || [ "$PATCHRIGHT_RELEASE" = "null" ]; then
-            echo "::error::No published patchright-core version matches Playwright $PLAYWRIGHT_TAG"
+          playwright_version=${playwright_version#v}
+          patchright_core_version=${patchright_core_version#v}
+          patchright_version=${patchright_version#v}
+          IFS=. read -r playwright_major playwright_minor playwright_patch <<< "$playwright_version"
+          playwright_line="$playwright_major.$playwright_minor"
+
+          if [ -z "$patchright_core_version" ]; then
+            patchright_core_version=$(npm view patchright-core versions --json | jq -r \
+              --arg line "$playwright_line" \
+              --argjson minimum_patch "$playwright_patch" '
+                [.[]
+                  | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))
+                  | select(startswith($line + "."))
+                  | select((split(".")[2] | tonumber) >= $minimum_patch)]
+                | sort_by(split(".") | map(tonumber))
+                | last // empty
+              ')
+          fi
+          if [ -z "$patchright_core_version" ]; then
+            echo "::error::No compatible patchright-core version exists for Playwright $playwright_version"
             exit 1
           fi
-          echo "patchright_release=$PATCHRIGHT_RELEASE" >> $GITHUB_ENV
-          git clone https://github.com/microsoft/playwright-python --branch "$PLAYWRIGHT_TAG"
+          if [ -z "$patchright_version" ]; then
+            patchright_version=$patchright_core_version
+          fi
+
+          echo "playwright_version=v$playwright_version" >> "$GITHUB_ENV"
+          echo "patchright_core_version=$patchright_core_version" >> "$GITHUB_ENV"
+          echo "patchright_version=$patchright_version" >> "$GITHUB_ENV"
+          git clone https://github.com/microsoft/playwright-python --branch "v$playwright_version"
           cd playwright-python
           uv add -r local-requirements.txt
 

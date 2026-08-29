@@ -4,7 +4,14 @@ import os
 
 import toml
 
-patchright_version = os.environ.get('patchright_release') or os.environ.get('playwright_version')
+playwright_version = os.environ.get("playwright_version", "").removeprefix("v")
+patchright_version = os.environ.get("patchright_version")
+patchright_core_version = os.environ.get("patchright_core_version")
+
+if not playwright_version or not patchright_version or not patchright_core_version:
+    raise RuntimeError(
+        "playwright_version, patchright_core_version, and patchright_version must be set"
+    )
 
 def patch_file(file_path: str, patched_tree: ast.AST) -> None:
     with open(file_path, "w") as f:
@@ -14,7 +21,7 @@ def patch_driver_version_file() -> None:
     driver_version_file = "playwright-python/DRIVER_VERSION"
     if os.path.exists(driver_version_file):
         with open(driver_version_file, "w") as f:
-            f.write(f"{patchright_version}\n")
+            f.write(f"{patchright_core_version}\n")
 
 def patch_build_driver() -> None:
     build_driver_file = "playwright-python/scripts/build_driver.py"
@@ -80,9 +87,12 @@ with open("playwright-python/pyproject.toml", "r") as f:
     pyproject_source["project"]["authors"] = [{'name': 'Microsoft Corporation, patched by github.com/Kaliiiiiiiiii-Vinyzu/'}]
 
     pyproject_source["project"]["urls"]["homepage"] = "https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python"
-    pyproject_source["project"]["urls"]["Release notes"] = "https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python/releases"
+    pyproject_source["project"]["urls"].pop("Release notes", None)
+    pyproject_source["project"]["urls"]["Release history"] = "https://pypi.org/project/patchright/#history"
     pyproject_source["project"]["urls"]["Bug Reports"] = "https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python/issues"
-    pyproject_source["project"]["urls"]["homeSource Codepage"] = "https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python"
+    pyproject_source["project"]["urls"]["Source Code"] = "https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python"
+    pyproject_source["project"]["urls"]["Playwright source"] = f"https://github.com/microsoft/playwright-python/tree/v{playwright_version}"
+    pyproject_source["project"]["urls"]["Patchright core"] = f"https://www.npmjs.com/package/patchright-core/v/{patchright_core_version}"
 
     del pyproject_source["project"]["scripts"]["playwright"]
     pyproject_source["project"]["scripts"]["patchright"] = "patchright.__main__:main"

@@ -17,14 +17,14 @@
         <img src="https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python/actions/workflows/patchright_tests.yml/badge.svg">
     </a>
     <br/>
-    <a href="https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python/releases/latest">
-        <img alt="Patchright Version" src="https://img.shields.io/github/v/release/microsoft/playwright-python?display_name=release&label=Version">
+    <a href="https://pypi.org/project/patchright/">
+        <img alt="Patchright Version" src="https://img.shields.io/pypi/v/patchright?label=Version">
     </a>
     <a href="https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python">
         <img src="https://img.shields.io/badge/Package-Python-seagreen">
     </a>
-    <a href="https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python/releases">
-        <img alt="GitHub Downloads (all assets, all releases)" src="https://img.shields.io/pepy/dt/patchright?color=red">
+    <a href="https://pypi.org/project/patchright/">
+        <img alt="PyPI Downloads" src="https://img.shields.io/pepy/dt/patchright?color=red">
     </a>
 </p>
 

@@ -4,19 +4,17 @@ on:
   # enabling manual trigger
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Playwright Version (e.g. v1.58.0 or 1.58.0)'
-        default: ''
-      patchright_release:
-        description: 'Patchright Release Version (e.g. v1.58.0 or 1.58.0) on pypi'
-        default: ''
+      patchright_version:
+        description: 'Patchright Release Version (e.g. v1.58.0 or 1.58.0) on PyPI'
+        required: true
+        type: string
   # running every hour
   schedule:
     - cron: '0 * * * *'
 
-env:
-  REPO: ${{ github.repository }}
-  patchright_release: ${{ github.event.inputs.patchright_release || '' }}
+concurrency:
+  group: patchright-pypi-release
+  cancel-in-progress: false
 
 jobs:
   check-release-version:
@@ -25,38 +23,18 @@ jobs:
     outputs:
       proceed: ${{ steps.version_check.outputs.proceed }}
       playwright_version: ${{ steps.version_check.outputs.playwright_version }}
+      patchright_core_version: ${{ steps.version_check.outputs.patchright_core_version }}
+      patchright_version: ${{ steps.version_check.outputs.patchright_version }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
 
       - name: Check Release Version
         id: version_check
+        env:
+          MANUAL_PATCHRIGHT_VERSION: ${{ inputs.patchright_version || '' }}
         run: |
-          PLAYWRIGHT_VERSION=""
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            raw_version="${{ github.event.inputs.version }}"
-            PLAYWRIGHT_VERSION="v${raw_version#v}"
-            echo "proceed=true" >>$GITHUB_OUTPUT
-            echo "playwright_version=$PLAYWRIGHT_VERSION" >> $GITHUB_ENV
-            if [ -n "${{ github.event.inputs.patchright_release }}" ]; then
-              raw_patchright_release="${{ github.event.inputs.patchright_release }}"
-              echo "patchright_release=${raw_patchright_release#v}" >> $GITHUB_ENV
-            fi
-          elif [ -n "${{ github.event.inputs.patchright_release }}" ]; then
-            raw_patchright_release="${{ github.event.inputs.patchright_release }}"
-            echo "patchright_release=${raw_patchright_release#v}" >> $GITHUB_ENV
-            response=$(curl --silent "https://api.github.com/repos/microsoft/playwright-python/releases/latest")
-            PLAYWRIGHT_VERSION=$(echo "$response" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
-            echo "proceed=true" >>$GITHUB_OUTPUT
-            echo "playwright_version=$PLAYWRIGHT_VERSION" >> $GITHUB_ENV
-          else
-            chmod +x utils/release_version_check.sh
-            utils/release_version_check.sh
-            PLAYWRIGHT_VERSION=$(grep '^playwright_version=' "$GITHUB_ENV" | tail -n1 | cut -d= -f2-)
-          fi
-          if [ -n "$PLAYWRIGHT_VERSION" ]; then
-            echo "playwright_version=$PLAYWRIGHT_VERSION" >> $GITHUB_OUTPUT
-          fi
+          utils/release_version_check.sh
 
   run-patchright-tests:
     name: Run Patchright Tests
@@ -65,16 +43,22 @@ jobs:
     uses: ./.github/workflows/patchright_tests.yml
     with:
       playwright_version: ${{ needs.check-release-version.outputs.playwright_version }}
+      patchright_core_version: ${{ needs.check-release-version.outputs.patchright_core_version }}
+      patchright_version: ${{ needs.check-release-version.outputs.patchright_version }}
 
   patchright-release-workflow:
     name: "Patchright-Python Workflow: Install, Patch, Build and Publish Patchright Python Package"
     needs: [check-release-version, run-patchright-tests]
     runs-on: ubuntu-latest
+    env:
+      playwright_version: ${{ needs.check-release-version.outputs.playwright_version }}
+      patchright_core_version: ${{ needs.check-release-version.outputs.patchright_core_version }}
+      patchright_version: ${{ needs.check-release-version.outputs.patchright_version }}
     environment:
       name: pypi
       url: https://pypi.org/p/patchright
     permissions:
-      contents: write
+      contents: read
       id-token: write # For trusted Publishing
     steps:
       - name: Checkout Repository
@@ -87,30 +71,20 @@ jobs:
         run: uv python install
 
       - name: Install Playwright-Python Package
-        env:
-          playwright_version: ${{ needs.check-release-version.outputs.playwright_version }}
         run: |
           uv sync --all-groups
-          if [ -n "$patchright_release" ]; then
-            PATCHRIGHT_RELEASE="${patchright_release#v}"
-          else
-            PLAYWRIGHT_MINOR=${playwright_version#v}
-            PLAYWRIGHT_MINOR=${PLAYWRIGHT_MINOR%.*}
-            PATCHRIGHT_RELEASE=$(npm view patchright-core versions --json | jq -r --arg minor "$PLAYWRIGHT_MINOR" '[.[] | select(startswith($minor + ".")) | select((try (split(".") | map(tonumber) | length) catch 0) == 3)] | sort_by(split(".") | map(tonumber)) | last')
-          fi
-          if [ -z "$PATCHRIGHT_RELEASE" ] || [ "$PATCHRIGHT_RELEASE" = "null" ]; then
-            echo "::error::No published patchright-core version matches Playwright $playwright_version"
+          if curl -fsSL "https://pypi.org/pypi/patchright/$patchright_version/json" >/dev/null 2>&1; then
+            echo "::error::Patchright $patchright_version already exists on PyPI"
             exit 1
           fi
-          if ! PUBLISHED_VERSION=$(npm view "patchright-core@$PATCHRIGHT_RELEASE" version); then
-            echo "::error::patchright-core@$PATCHRIGHT_RELEASE is not available from npm"
+          if ! published_version=$(npm view "patchright-core@$patchright_core_version" version); then
+            echo "::error::patchright-core@$patchright_core_version is not available from npm"
             exit 1
           fi
-          if [ "$PUBLISHED_VERSION" != "$PATCHRIGHT_RELEASE" ]; then
-            echo "::error::Expected patchright-core@$PATCHRIGHT_RELEASE, npm returned $PUBLISHED_VERSION"
+          if [ "$published_version" != "$patchright_core_version" ]; then
+            echo "::error::Expected patchright-core@$patchright_core_version, npm returned $published_version"
             exit 1
           fi
-          echo "patchright_release=$PATCHRIGHT_RELEASE" >> $GITHUB_ENV
           git clone https://github.com/microsoft/playwright-python --branch "$playwright_version"
           uv add -r playwright-python/local-requirements.txt --dev
 
@@ -126,19 +100,6 @@ jobs:
           for wheel in $(uv run setup.py --list-wheels); do
             PLAYWRIGHT_TARGET_WHEEL=$wheel uv build --wheel
           done
-
-      - name: Create Empty Versioning Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ needs.check-release-version.outputs.playwright_version }}
-          release_name: ${{ needs.check-release-version.outputs.playwright_version }}
-          body: |
-            This is an automatic deployment in response to a new release of [microsoft/playwright-python](https://github.com/microsoft/playwright-python).
-            This Release is only used for Versioning.
-          draft: false
-          prerelease: false
 
       - name: Publish Patchright-Python Package
         uses: pypa/gh-action-pypi-publish@release/v1
