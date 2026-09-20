@@ -40,9 +40,10 @@ def patch_build_driver() -> None:
         if isinstance(node, ast.Assign)
         and len(node.targets) == 1
         and isinstance(node.targets[0], ast.Name)
-        and node.targets[0].id in {"url", "tgz"}
+        and node.targets[0].id in {"url", "spec", "tgz"}
     ]
-    if {node.targets[0].id for node in artifact_assignments} != {"url", "tgz"}:
+    artifact_names = {node.targets[0].id for node in artifact_assignments}
+    if "tgz" not in artifact_names or not artifact_names & {"url", "spec"}:
         raise RuntimeError("Unexpected scripts/build_driver.py structure")
 
     targets = [

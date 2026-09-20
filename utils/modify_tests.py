@@ -98,6 +98,12 @@ def process_file(file_path):
     annotator.visit(file_tree)
 
     for node in ast.walk(file_tree):
+        # Rename Playwright imports embedded in scripts executed by subprocesses.
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            node.value = node.value.replace(
+                "from playwright.", "from patchright."
+            ).replace("import playwright", "import patchright")
+
         # Rename Playwright Imports to Patchright
         if isinstance(node, ast.Import):
             for alias in node.names:
