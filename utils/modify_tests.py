@@ -24,6 +24,9 @@ tests_to_skip = [
     "test_weberror_event_should_work",
     "test_console_repr",
     "test_console_should_work",
+    # These signal-handler tests also require console events.
+    "test_sync_expect_event_should_survive_exception_raised_by_signal_handler",
+    "test_sync_should_survive_exception_raised_by_signal_handler_while_event_handler_blocks",
     "test_should_collect_trace_with_resources_but_no_js",
     "test_should_work_with_playwright_context_managers",
     "test_should_respect_traces_dir_and_name",
