@@ -36,8 +36,10 @@ jobs:
       patchright_core_version: ${{ steps.version_check.outputs.patchright_core_version }}
       patchright_version: ${{ steps.version_check.outputs.patchright_version }}
     steps:
+      # Actions are pinned to a full commit SHA, which can't be moved like a tag; the comment
+      # names the release it points to, and Dependabot (.github/dependabot.yml) keeps both up to date.
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false # don't leave the token in .git/config for later steps
 
@@ -73,12 +75,12 @@ jobs:
       sha256: ${{ steps.build.outputs.sha256 }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           enable-cache: false # build release packages from a clean install, not a shared cache
 
@@ -108,7 +110,8 @@ jobs:
       - name: Patch Playwright-Python Package
         run: |
           uv run patch_python_package.py
-          uvx ruff format playwright-python
+          # Pinned so the formatting step is reproducible; Dependabot does not update it, so bump by hand.
+          uvx ruff@0.17.6 format playwright-python
 
       # Build the wheels and record their SHA-256 checksums as a job output for publish-pypi.
       - name: Build Patchright-Python Package
@@ -128,7 +131,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Upload Patchright-Python Package
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: patchright-python-dist
           path: playwright-python/dist/
@@ -148,7 +151,7 @@ jobs:
       id-token: write # For trusted Publishing
     steps:
       - name: Download Patchright-Python Package
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           name: patchright-python-dist
           path: dist/
@@ -163,7 +166,9 @@ jobs:
           test "$(find dist -type f | wc -l)" -eq "$(printf '%s\n' "$SHA256_MANIFEST" | wc -l)"
 
       - name: Publish Patchright-Python Package
-        uses: pypa/gh-action-pypi-publish@release/v1
+        # PyPA recommends `@release/v1`; this is pinned to the commit of the latest release tag instead,
+        # and Dependabot (.github/dependabot.yml) keeps it up to date.
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: dist/
           verbose: true
