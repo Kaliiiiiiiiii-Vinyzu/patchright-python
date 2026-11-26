@@ -1,5 +1,11 @@
 name: Patchright Release Workflow
 
+# Job flow: check-release-version -> run-patchright-tests
+#   -> patchright-release-workflow: build the wheels (read-only token)
+#   -> publish-pypi: verify the checksums and publish (the only job with id-token: write).
+# Build and publish are separate jobs so the PyPI publish token is never present while
+# dependency installs and the playwright-python build run; only the wheels and their checksums are passed on.
+
 on:
   # enabling manual trigger
   workflow_dispatch:
@@ -16,6 +22,10 @@ concurrency:
   group: patchright-pypi-release
   cancel-in-progress: false
 
+# Read-only by default; jobs that need more ask for it themselves.
+permissions:
+  contents: read
+
 jobs:
   check-release-version:
     name: Check Release Version
@@ -28,6 +38,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false # don't leave the token in .git/config for later steps
 
       - name: Check Release Version
         id: version_check
@@ -47,25 +59,28 @@ jobs:
       patchright_version: ${{ needs.check-release-version.outputs.patchright_version }}
 
   patchright-release-workflow:
-    name: "Patchright-Python Workflow: Install, Patch, Build and Publish Patchright Python Package"
+    name: "Patchright-Python Workflow: Install, Patch and Build Patchright Python Package"
     needs: [check-release-version, run-patchright-tests]
     runs-on: ubuntu-latest
     env:
       playwright_version: ${{ needs.check-release-version.outputs.playwright_version }}
       patchright_core_version: ${{ needs.check-release-version.outputs.patchright_core_version }}
       patchright_version: ${{ needs.check-release-version.outputs.patchright_version }}
-    environment:
-      name: pypi
-      url: https://pypi.org/p/patchright
+    # Read-only: this job installs dependencies and runs the build, so it gets no publish rights.
     permissions:
       contents: read
-      id-token: write # For trusted Publishing
+    outputs:
+      sha256: ${{ steps.build.outputs.sha256 }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: false # build release packages from a clean install, not a shared cache
 
       - name: Set up Python
         run: uv python install
@@ -86,6 +101,8 @@ jobs:
             exit 1
           fi
           git clone https://github.com/microsoft/playwright-python --branch "$playwright_version"
+          # Log the exact upstream commit the tag pointed to, so the build can be traced later.
+          echo "microsoft/playwright-python $playwright_version is commit $(git -C playwright-python rev-parse HEAD)"
           uv add -r playwright-python/local-requirements.txt --dev
 
       - name: Patch Playwright-Python Package
@@ -93,16 +110,60 @@ jobs:
           uv run patch_python_package.py
           uvx ruff format playwright-python
 
+      # Build the wheels and record their SHA-256 checksums as a job output for publish-pypi.
       - name: Build Patchright-Python Package
+        id: build
         run: |
           cd playwright-python
           uv pip install -e .
           for wheel in $(uv run setup.py --list-wheels); do
             PLAYWRIGHT_TARGET_WHEEL=$wheel uv build --wheel
           done
+          manifest=$(sha256sum dist/*)
+          echo "$manifest"
+          {
+            echo "sha256<<SHA256_EOF"
+            echo "$manifest"
+            echo "SHA256_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload Patchright-Python Package
+        uses: actions/upload-artifact@v6
+        with:
+          name: patchright-python-dist
+          path: playwright-python/dist/
+          if-no-files-found: error
+          retention-days: 7 # only needed until publish-pypi has run
+
+  publish-pypi:
+    name: "Patchright-Python Workflow: Publish Patchright Python Package"
+    needs: [patchright-release-workflow]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/patchright
+    # The only job that can get a publish token. It checks out no code and builds nothing:
+    # it only verifies and publishes the wheels.
+    permissions:
+      id-token: write # For trusted Publishing
+    steps:
+      - name: Download Patchright-Python Package
+        uses: actions/download-artifact@v6
+        with:
+          name: patchright-python-dist
+          path: dist/
+
+      # Publish exactly what the build job built: no changed, missing or extra files.
+      - name: Verify Package Checksums
+        env:
+          SHA256_MANIFEST: ${{ needs.patchright-release-workflow.outputs.sha256 }}
+        run: |
+          printf '%s\n' "$SHA256_MANIFEST" | sha256sum --check --strict
+          # Refuse to publish files that were not in the build job's manifest.
+          test "$(find dist -type f | wc -l)" -eq "$(printf '%s\n' "$SHA256_MANIFEST" | wc -l)"
 
       - name: Publish Patchright-Python Package
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: playwright-python/dist/
+          packages-dir: dist/
           verbose: true
